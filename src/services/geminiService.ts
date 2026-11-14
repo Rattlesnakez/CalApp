@@ -425,7 +425,7 @@ export async function analyzeFoodPhoto(params: {
     return getDemoFallbackForCategory(category);
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
 
   const categoryLabel =
     category === 'desayuno'
@@ -435,6 +435,7 @@ export async function analyzeFoodPhoto(params: {
         : 'Cena';
 
   const interaction = await ai.interactions.create({
+    api_version: 'v1beta',
     model: 'gemini-4-hydrogen',
     input: [
       {
@@ -1137,7 +1138,7 @@ export async function analyzeFoodDescription(params: {
     return estimateFoodFromTextLocally(cleanDescription, category);
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
   const categoryLabel =
     category === 'desayuno'
       ? 'Desayuno'
@@ -1146,6 +1147,7 @@ export async function analyzeFoodDescription(params: {
         : 'Cena';
 
   const interaction = await ai.interactions.create({
+    api_version: 'v1beta',
     model: 'gemini-4-hydrogen',
     input: `Eres un nutriólogo experto. El usuario registró manualmente esta comida (${categoryLabel}): "${cleanDescription}". Desglosa cada alimento mencionado, estima su porción en gramos o medidas caseras, sus calorías (kcal) y macronutrientes (proteínas, carbohidratos y grasas en gramos). Devuelve el resultado en español siguiendo exactamente el esquema JSON.`,
     response_format: {
