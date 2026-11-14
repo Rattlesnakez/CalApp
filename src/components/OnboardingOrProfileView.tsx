@@ -5,12 +5,14 @@ import {
   Eye,
   EyeOff,
   Flame,
+  HelpCircle,
   KeyRound,
   Scale,
   Sparkles,
   Target,
   User,
 } from 'lucide-react';
+import { ApiKeyTutorialBox } from './ApiKeyTutorialBox';
 import type { ActivityLevel, Gender, GoalType, UserProfile } from '../types';
 import {
   ACTIVITY_LABELS,
@@ -40,6 +42,7 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
   );
   const [apiKeyInput, setApiKeyInput] = useState<string>(() => loadGeminiApiKey());
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [showApiTutorial, setShowApiTutorial] = useState<boolean>(false);
   const [savedToast, setSavedToast] = useState<string>('');
 
   useEffect(() => {
@@ -458,6 +461,24 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
             Quitar API Key y usar Modo Demo
           </button>
         )}
+
+        <div className="pt-1 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowApiTutorial((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800"
+          >
+            <HelpCircle className="w-4 h-4 shrink-0" />
+            {showApiTutorial
+              ? 'Ocultar tutorial'
+              : '¿Cómo conseguir mi API Key gratis? (Ver tutorial)'}
+          </button>
+          {showApiTutorial && (
+            <div className="mt-2.5">
+              <ApiKeyTutorialBox footerNote="La clave se guarda únicamente en este dispositivo (localStorage) y el nivel estándar de Google AI Studio es gratuito para uso personal." />
+            </div>
+          )}
+        </div>
       </div>
 
       {savedToast && (

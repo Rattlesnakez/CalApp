@@ -495,3 +495,730 @@ export async function analyzeFoodPhoto(params: {
     isDemo: false,
   };
 }
+
+interface FoodNutritionEntry {
+  keywords: string[];
+  displayName: string;
+  defaultPortion: string;
+  gramsPerUnit: number;
+  kcalPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+}
+
+const FOOD_DICTIONARY: FoodNutritionEntry[] = [
+  {
+    keywords: ['clara de huevo', 'claras'],
+    displayName: 'Claras de huevo',
+    defaultPortion: '1 clara (33 g)',
+    gramsPerUnit: 33,
+    kcalPer100g: 52,
+    proteinPer100g: 11,
+    carbsPer100g: 0.7,
+    fatPer100g: 0.2,
+  },
+  {
+    keywords: ['huevo', 'huevos', 'blanquillo'],
+    displayName: 'Huevo',
+    defaultPortion: '1 pieza (55 g)',
+    gramsPerUnit: 55,
+    kcalPer100g: 155,
+    proteinPer100g: 13,
+    carbsPer100g: 1.1,
+    fatPer100g: 11,
+  },
+  {
+    keywords: ['tortilla de harina', 'tortillas de harina'],
+    displayName: 'Tortilla de harina',
+    defaultPortion: '1 pieza (45 g)',
+    gramsPerUnit: 45,
+    kcalPer100g: 310,
+    proteinPer100g: 8,
+    carbsPer100g: 52,
+    fatPer100g: 8,
+  },
+  {
+    keywords: ['tortilla', 'tortillas'],
+    displayName: 'Tortilla de maíz',
+    defaultPortion: '1 pieza (28 g)',
+    gramsPerUnit: 28,
+    kcalPer100g: 218,
+    proteinPer100g: 5.7,
+    carbsPer100g: 45,
+    fatPer100g: 2.8,
+  },
+  {
+    keywords: ['pan tostado', 'pan integral', 'rebanada de pan', 'pan de caja', 'pan'],
+    displayName: 'Pan de caja / tostado',
+    defaultPortion: '1 rebanada (30 g)',
+    gramsPerUnit: 30,
+    kcalPer100g: 265,
+    proteinPer100g: 9,
+    carbsPer100g: 49,
+    fatPer100g: 3.5,
+  },
+  {
+    keywords: ['bolillo', 'telera'],
+    displayName: 'Bolillo',
+    defaultPortion: '1 pieza (60 g)',
+    gramsPerUnit: 60,
+    kcalPer100g: 270,
+    proteinPer100g: 8.5,
+    carbsPer100g: 56,
+    fatPer100g: 1.5,
+  },
+  {
+    keywords: ['arroz'],
+    displayName: 'Arroz cocido',
+    defaultPortion: '1 taza (160 g)',
+    gramsPerUnit: 160,
+    kcalPer100g: 130,
+    proteinPer100g: 2.7,
+    carbsPer100g: 28,
+    fatPer100g: 0.3,
+  },
+  {
+    keywords: ['frijol', 'frijoles'],
+    displayName: 'Frijoles cocidos',
+    defaultPortion: '1 taza (170 g)',
+    gramsPerUnit: 170,
+    kcalPer100g: 127,
+    proteinPer100g: 8.7,
+    carbsPer100g: 23,
+    fatPer100g: 0.5,
+  },
+  {
+    keywords: ['lenteja', 'lentejas'],
+    displayName: 'Lentejas cocidas',
+    defaultPortion: '1 taza (180 g)',
+    gramsPerUnit: 180,
+    kcalPer100g: 116,
+    proteinPer100g: 9,
+    carbsPer100g: 20,
+    fatPer100g: 0.4,
+  },
+  {
+    keywords: ['pechuga de pollo', 'pechuga', 'pollo'],
+    displayName: 'Pechuga de pollo',
+    defaultPortion: '150 g',
+    gramsPerUnit: 150,
+    kcalPer100g: 165,
+    proteinPer100g: 31,
+    carbsPer100g: 0,
+    fatPer100g: 3.6,
+  },
+  {
+    keywords: ['carne asada', 'bistec', 'res', 'carne de res', 'arrachera', 'carne'],
+    displayName: 'Carne de res',
+    defaultPortion: '150 g',
+    gramsPerUnit: 150,
+    kcalPer100g: 215,
+    proteinPer100g: 26,
+    carbsPer100g: 0,
+    fatPer100g: 12,
+  },
+  {
+    keywords: ['cerdo', 'chuleta', 'carnitas', 'pastor', 'jamon', 'jamón'],
+    displayName: 'Carne de cerdo / jamón',
+    defaultPortion: '100 g',
+    gramsPerUnit: 100,
+    kcalPer100g: 195,
+    proteinPer100g: 21,
+    carbsPer100g: 1,
+    fatPer100g: 12,
+  },
+  {
+    keywords: ['salchicha', 'chorizo', 'tocino'],
+    displayName: 'Embutido / tocino',
+    defaultPortion: '1 porción (50 g)',
+    gramsPerUnit: 50,
+    kcalPer100g: 310,
+    proteinPer100g: 14,
+    carbsPer100g: 2,
+    fatPer100g: 27,
+  },
+  {
+    keywords: ['atun', 'atún'],
+    displayName: 'Atún en agua',
+    defaultPortion: '1 lata (100 g)',
+    gramsPerUnit: 100,
+    kcalPer100g: 116,
+    proteinPer100g: 26,
+    carbsPer100g: 0,
+    fatPer100g: 1,
+  },
+  {
+    keywords: ['salmon', 'salmón'],
+    displayName: 'Salmón',
+    defaultPortion: '150 g',
+    gramsPerUnit: 150,
+    kcalPer100g: 208,
+    proteinPer100g: 20,
+    carbsPer100g: 0,
+    fatPer100g: 13,
+  },
+  {
+    keywords: ['pescado', 'tilapia', 'filete de pescado', 'mojarra'],
+    displayName: 'Filete de pescado',
+    defaultPortion: '150 g',
+    gramsPerUnit: 150,
+    kcalPer100g: 128,
+    proteinPer100g: 24,
+    carbsPer100g: 0,
+    fatPer100g: 3,
+  },
+  {
+    keywords: ['camaron', 'camarón', 'camarones'],
+    displayName: 'Camarones',
+    defaultPortion: '120 g',
+    gramsPerUnit: 120,
+    kcalPer100g: 99,
+    proteinPer100g: 24,
+    carbsPer100g: 0.2,
+    fatPer100g: 0.3,
+  },
+  {
+    keywords: ['aguacate', 'guacamole'],
+    displayName: 'Aguacate',
+    defaultPortion: '1/2 pieza (75 g)',
+    gramsPerUnit: 75,
+    kcalPer100g: 160,
+    proteinPer100g: 2,
+    carbsPer100g: 8.5,
+    fatPer100g: 14.7,
+  },
+  {
+    keywords: ['queso panela', 'requeson', 'requesón', 'cottage'],
+    displayName: 'Queso fresco / panela',
+    defaultPortion: '50 g',
+    gramsPerUnit: 50,
+    kcalPer100g: 190,
+    proteinPer100g: 17,
+    carbsPer100g: 2,
+    fatPer100g: 12,
+  },
+  {
+    keywords: ['queso', 'manchego', 'oaxaca', 'mozzarella', 'cheddar'],
+    displayName: 'Queso',
+    defaultPortion: '40 g',
+    gramsPerUnit: 40,
+    kcalPer100g: 320,
+    proteinPer100g: 22,
+    carbsPer100g: 2,
+    fatPer100g: 25,
+  },
+  {
+    keywords: ['leche'],
+    displayName: 'Leche',
+    defaultPortion: '1 vaso (240 ml)',
+    gramsPerUnit: 240,
+    kcalPer100g: 52,
+    proteinPer100g: 3.4,
+    carbsPer100g: 5,
+    fatPer100g: 2,
+  },
+  {
+    keywords: ['yogur', 'yogurt'],
+    displayName: 'Yogur natural',
+    defaultPortion: '1 taza (170 g)',
+    gramsPerUnit: 170,
+    kcalPer100g: 75,
+    proteinPer100g: 6,
+    carbsPer100g: 7,
+    fatPer100g: 2.5,
+  },
+  {
+    keywords: ['avena'],
+    displayName: 'Avena',
+    defaultPortion: '1/2 taza seca (45 g)',
+    gramsPerUnit: 45,
+    kcalPer100g: 380,
+    proteinPer100g: 13,
+    carbsPer100g: 67,
+    fatPer100g: 7,
+  },
+  {
+    keywords: ['platano', 'plátano', 'banana'],
+    displayName: 'Plátano',
+    defaultPortion: '1 pieza (115 g)',
+    gramsPerUnit: 115,
+    kcalPer100g: 89,
+    proteinPer100g: 1.1,
+    carbsPer100g: 23,
+    fatPer100g: 0.3,
+  },
+  {
+    keywords: ['manzana'],
+    displayName: 'Manzana',
+    defaultPortion: '1 pieza (160 g)',
+    gramsPerUnit: 160,
+    kcalPer100g: 52,
+    proteinPer100g: 0.3,
+    carbsPer100g: 14,
+    fatPer100g: 0.2,
+  },
+  {
+    keywords: ['naranja', 'mandarina', 'papaya', 'melón', 'melon', 'sandia', 'sandía', 'piña', 'fruta'],
+    displayName: 'Fruta fresca',
+    defaultPortion: '1 taza (150 g)',
+    gramsPerUnit: 150,
+    kcalPer100g: 48,
+    proteinPer100g: 0.8,
+    carbsPer100g: 12,
+    fatPer100g: 0.2,
+  },
+  {
+    keywords: ['fresa', 'fresas', 'frutos rojos', 'arándanos', 'arandanos', 'moras'],
+    displayName: 'Frutos rojos',
+    defaultPortion: '1 taza (140 g)',
+    gramsPerUnit: 140,
+    kcalPer100g: 40,
+    proteinPer100g: 0.8,
+    carbsPer100g: 9,
+    fatPer100g: 0.3,
+  },
+  {
+    keywords: ['ensalada', 'lechuga', 'espinaca', 'nopales', 'verduras', 'brocoli', 'brócoli', 'zanahoria', 'tomate', 'jitomate', 'pepino'],
+    displayName: 'Verduras / ensalada',
+    defaultPortion: '1 porción (150 g)',
+    gramsPerUnit: 150,
+    kcalPer100g: 32,
+    proteinPer100g: 2,
+    carbsPer100g: 6,
+    fatPer100g: 0.3,
+  },
+  {
+    keywords: ['papa', 'papas', 'patata', 'camote'],
+    displayName: 'Papa / camote',
+    defaultPortion: '1 pieza (150 g)',
+    gramsPerUnit: 150,
+    kcalPer100g: 93,
+    proteinPer100g: 2.2,
+    carbsPer100g: 21,
+    fatPer100g: 0.1,
+  },
+  {
+    keywords: ['pasta', 'espagueti', 'fideos', 'macarrones'],
+    displayName: 'Pasta cocida',
+    defaultPortion: '1 taza (150 g)',
+    gramsPerUnit: 150,
+    kcalPer100g: 158,
+    proteinPer100g: 5.8,
+    carbsPer100g: 31,
+    fatPer100g: 0.9,
+  },
+  {
+    keywords: ['pizza'],
+    displayName: 'Rebanada de pizza',
+    defaultPortion: '1 rebanada (115 g)',
+    gramsPerUnit: 115,
+    kcalPer100g: 266,
+    proteinPer100g: 11,
+    carbsPer100g: 33,
+    fatPer100g: 10,
+  },
+  {
+    keywords: ['hamburguesa'],
+    displayName: 'Hamburguesa',
+    defaultPortion: '1 pieza (220 g)',
+    gramsPerUnit: 220,
+    kcalPer100g: 245,
+    proteinPer100g: 13,
+    carbsPer100g: 22,
+    fatPer100g: 12,
+  },
+  {
+    keywords: ['taco', 'tacos'],
+    displayName: 'Taco',
+    defaultPortion: '1 pieza (75 g)',
+    gramsPerUnit: 75,
+    kcalPer100g: 225,
+    proteinPer100g: 11,
+    carbsPer100g: 22,
+    fatPer100g: 10,
+  },
+  {
+    keywords: ['quesadilla', 'quesadillas'],
+    displayName: 'Quesadilla',
+    defaultPortion: '1 pieza (90 g)',
+    gramsPerUnit: 90,
+    kcalPer100g: 265,
+    proteinPer100g: 11,
+    carbsPer100g: 26,
+    fatPer100g: 13,
+  },
+  {
+    keywords: ['torta', 'sandwich', 'sándwich'],
+    displayName: 'Sándwich / torta',
+    defaultPortion: '1 pieza (180 g)',
+    gramsPerUnit: 180,
+    kcalPer100g: 220,
+    proteinPer100g: 11,
+    carbsPer100g: 26,
+    fatPer100g: 8,
+  },
+  {
+    keywords: ['chilaquiles'],
+    displayName: 'Chilaquiles',
+    defaultPortion: '1 plato (250 g)',
+    gramsPerUnit: 250,
+    kcalPer100g: 185,
+    proteinPer100g: 7,
+    carbsPer100g: 20,
+    fatPer100g: 9,
+  },
+  {
+    keywords: ['aceite', 'mantequilla', 'crema', 'mayonesa'],
+    displayName: 'Aceite / grasa añadida',
+    defaultPortion: '1 cucharada (12 g)',
+    gramsPerUnit: 12,
+    kcalPer100g: 750,
+    proteinPer100g: 0,
+    carbsPer100g: 0,
+    fatPer100g: 83,
+  },
+  {
+    keywords: ['nuez', 'nueces', 'almendra', 'almendras', 'cacahuate', 'crema de mani', 'crema de cacahuate'],
+    displayName: 'Frutos secos / crema de maní',
+    defaultPortion: '1 puño / 2 cdas (30 g)',
+    gramsPerUnit: 30,
+    kcalPer100g: 590,
+    proteinPer100g: 21,
+    carbsPer100g: 18,
+    fatPer100g: 50,
+  },
+  {
+    keywords: ['cafe con leche', 'café con leche', 'capuchino', 'latte'],
+    displayName: 'Café con leche',
+    defaultPortion: '1 taza (240 ml)',
+    gramsPerUnit: 240,
+    kcalPer100g: 38,
+    proteinPer100g: 2,
+    carbsPer100g: 4,
+    fatPer100g: 1.5,
+  },
+  {
+    keywords: ['cafe', 'café', 'te', 'té', 'agua'],
+    displayName: 'Café / té sin azúcar',
+    defaultPortion: '1 taza (240 ml)',
+    gramsPerUnit: 240,
+    kcalPer100g: 2,
+    proteinPer100g: 0,
+    carbsPer100g: 0.4,
+    fatPer100g: 0,
+  },
+  {
+    keywords: ['jugo', 'refresco', 'licuado', 'soda', 'coca'],
+    displayName: 'Bebida / jugo',
+    defaultPortion: '1 vaso (250 ml)',
+    gramsPerUnit: 250,
+    kcalPer100g: 46,
+    proteinPer100g: 0.4,
+    carbsPer100g: 11,
+    fatPer100g: 0,
+  },
+  {
+    keywords: ['proteina', 'proteína', 'whey', 'scoop'],
+    displayName: 'Proteína en polvo',
+    defaultPortion: '1 scoop (32 g)',
+    gramsPerUnit: 32,
+    kcalPer100g: 380,
+    proteinPer100g: 78,
+    carbsPer100g: 8,
+    fatPer100g: 4,
+  },
+  {
+    keywords: ['chocolate', 'galleta', 'galletas', 'pan dulce', 'pastel', 'dona'],
+    displayName: 'Postre / pan dulce',
+    defaultPortion: '1 pieza (60 g)',
+    gramsPerUnit: 60,
+    kcalPer100g: 410,
+    proteinPer100g: 5,
+    carbsPer100g: 58,
+    fatPer100g: 18,
+  },
+];
+
+function normalizeSpanishText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function parseQuantityAndGrams(
+  text: string,
+  defaultGramsPerUnit: number
+): { grams: number; portionLabel: string } {
+  const combined = normalizeSpanishText(text);
+
+  // Detectar gramos o mililitros explícitos (ej. "200 g", "150gr", "250 ml")
+  const gramMatch = combined.match(/(\d+(?:[.,]\d+)?)\s*(g|gr|gramos|ml)\b/);
+  if (gramMatch) {
+    const val = Number(gramMatch[1].replace(',', '.'));
+    if (val > 0) {
+      const unit = gramMatch[2] === 'ml' ? 'ml' : 'g';
+      return {
+        grams: val,
+        portionLabel: `${Math.round(val)} ${unit}`,
+      };
+    }
+  }
+
+  // Detectar fracciones comunes ("media", "1/2", "1/4")
+  if (/\b(1\/2|media|medio)\b/.test(combined)) {
+    return {
+      grams: defaultGramsPerUnit * 0.5,
+      portionLabel: `1/2 porción (${Math.round(defaultGramsPerUnit * 0.5)} g)`,
+    };
+  }
+  if (/\b(1\/4|un cuarto)\b/.test(combined)) {
+    return {
+      grams: defaultGramsPerUnit * 0.25,
+      portionLabel: `1/4 porción (${Math.round(defaultGramsPerUnit * 0.25)} g)`,
+    };
+  }
+
+  // Detectar número de unidades (ej. "2 huevos", "3 tortillas", "dos tacos")
+  const wordNumbers: Record<string, number> = {
+    un: 1,
+    una: 1,
+    uno: 1,
+    dos: 2,
+    tres: 3,
+    cuatro: 4,
+    cinco: 5,
+    seis: 6,
+  };
+
+  const numMatch = combined.match(/\b(\d+(?:[.,]\d+)?)\b/);
+  if (numMatch) {
+    const count = Math.min(20, Math.max(0.25, Number(numMatch[1].replace(',', '.'))));
+    return {
+      grams: defaultGramsPerUnit * count,
+      portionLabel:
+        count === 1
+          ? `1 porción (${Math.round(defaultGramsPerUnit)} g)`
+          : `${count} piezas/porciones (${Math.round(defaultGramsPerUnit * count)} g)`,
+    };
+  }
+
+  for (const [word, count] of Object.entries(wordNumbers)) {
+    const wordRegex = new RegExp(`\\b${word}\\b`);
+    if (wordRegex.test(combined)) {
+      return {
+        grams: defaultGramsPerUnit * count,
+        portionLabel:
+          count === 1
+            ? `1 porción (${Math.round(defaultGramsPerUnit)} g)`
+            : `${count} piezas/porciones (${Math.round(defaultGramsPerUnit * count)} g)`,
+      };
+    }
+  }
+
+  return {
+    grams: defaultGramsPerUnit,
+    portionLabel: `1 porción (${Math.round(defaultGramsPerUnit)} g)`,
+  };
+}
+
+export function estimateSingleIngredientLocally(
+  rawText: string,
+  portionHint?: string
+): DetectedFoodItem {
+  const cleanRaw = rawText.trim();
+  const searchSource = normalizeSpanishText(`${cleanRaw} ${portionHint ?? ''}`);
+
+  let matched: FoodNutritionEntry | undefined;
+  for (const entry of FOOD_DICTIONARY) {
+    if (
+      entry.keywords.some((kw) =>
+        searchSource.includes(normalizeSpanishText(kw))
+      )
+    ) {
+      matched = entry;
+      break;
+    }
+  }
+
+  if (matched) {
+    const { grams, portionLabel } = parseQuantityAndGrams(
+      `${cleanRaw} ${portionHint ?? ''}`,
+      matched.gramsPerUnit
+    );
+    const factor = grams / 100;
+    return {
+      name: cleanRaw.charAt(0).toUpperCase() + cleanRaw.slice(1),
+      portion: portionHint?.trim() || portionLabel,
+      calories: Math.max(1, Math.round(matched.kcalPer100g * factor)),
+      protein: Math.max(0, Math.round(matched.proteinPer100g * factor)),
+      carbs: Math.max(0, Math.round(matched.carbsPer100g * factor)),
+      fat: Math.max(0, Math.round(matched.fatPer100g * factor)),
+    };
+  }
+
+  // Fallback genérico si no coincide con el diccionario
+  const { grams, portionLabel } = parseQuantityAndGrams(
+    `${cleanRaw} ${portionHint ?? ''}`,
+    120
+  );
+  const calories = Math.max(25, Math.round((grams / 100) * 145));
+  return {
+    name: cleanRaw ? cleanRaw.charAt(0).toUpperCase() + cleanRaw.slice(1) : 'Alimento',
+    portion: portionHint?.trim() || portionLabel,
+    calories,
+    protein: Math.round((calories * 0.22) / 4),
+    carbs: Math.round((calories * 0.48) / 4),
+    fat: Math.round((calories * 0.3) / 9),
+  };
+}
+
+function estimateFoodFromTextLocally(
+  description: string,
+  category: MealCategory
+): MealAnalysisResult {
+  const rawParts = description
+    .split(/[,;\n+]+|\s+y\s+|\s+con\s+/i)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 1);
+
+  const parts = rawParts.length > 0 ? rawParts : [description.trim()];
+  const items = parts.map((part) => estimateSingleIngredientLocally(part));
+  const totals = recalculateTotalsFromItems(items);
+  const categoryLabel =
+    category === 'desayuno'
+      ? 'Desayuno'
+      : category === 'comida'
+        ? 'Comida'
+        : 'Cena';
+
+  const summaryName =
+    description.trim().length <= 55
+      ? description.trim().charAt(0).toUpperCase() + description.trim().slice(1)
+      : `${categoryLabel}: ${items
+          .slice(0, 2)
+          .map((i) => i.name)
+          .join(' y ')}`;
+
+  return {
+    mealName: summaryName,
+    totalCalories: totals.totalCalories,
+    protein: totals.protein,
+    carbs: totals.carbs,
+    fat: totals.fat,
+    items,
+    aiTip:
+      'Estimación automática local basada en porciones estándar. Conecta tu API Key de Gemini para análisis nutricional con IA avanzada.',
+    isDemo: true,
+  };
+}
+
+/**
+ * Calcula automáticamente las calorías y macronutrientes de una comida descrita en texto manual.
+ * Usa Gemini (`gemini-4-hydrogen`) cuando hay API Key, o el motor nutricional local cuando no hay clave.
+ */
+export async function analyzeFoodDescription(params: {
+  description: string;
+  category: MealCategory;
+  forceDemo?: boolean;
+}): Promise<MealAnalysisResult> {
+  const { description, category, forceDemo } = params;
+  const cleanDescription = description.trim();
+  if (!cleanDescription) {
+    throw new Error('Escribe al menos un alimento para calcular sus calorías.');
+  }
+
+  const apiKey = loadGeminiApiKey();
+
+  if (forceDemo || !apiKey) {
+    await new Promise((r) => setTimeout(r, 700));
+    return estimateFoodFromTextLocally(cleanDescription, category);
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const categoryLabel =
+    category === 'desayuno'
+      ? 'Desayuno'
+      : category === 'comida'
+        ? 'Comida'
+        : 'Cena';
+
+  const interaction = await ai.interactions.create({
+    model: 'gemini-4-hydrogen',
+    input: `Eres un nutriólogo experto. El usuario registró manualmente esta comida (${categoryLabel}): "${cleanDescription}". Desglosa cada alimento mencionado, estima su porción en gramos o medidas caseras, sus calorías (kcal) y macronutrientes (proteínas, carbohidratos y grasas en gramos). Devuelve el resultado en español siguiendo exactamente el esquema JSON.`,
+    response_format: {
+      type: 'text',
+      mime_type: 'application/json',
+      schema: mealAnalysisJsonSchema,
+    },
+  });
+
+  const rawText = interaction.output_text;
+  if (!rawText) {
+    return estimateFoodFromTextLocally(cleanDescription, category);
+  }
+
+  const parsed = JSON.parse(rawText) as Partial<MealAnalysisResult>;
+  const items: DetectedFoodItem[] = Array.isArray(parsed.items)
+    ? parsed.items.map((item) => ({
+        name: String(item.name || 'Alimento'),
+        portion: String(item.portion || '1 porción'),
+        calories: Math.max(0, Math.round(Number(item.calories) || 0)),
+        protein: Math.max(0, Math.round(Number(item.protein) || 0)),
+        carbs: Math.max(0, Math.round(Number(item.carbs) || 0)),
+        fat: Math.max(0, Math.round(Number(item.fat) || 0)),
+      }))
+    : [];
+
+  const recalculated =
+    items.length > 0
+      ? recalculateTotalsFromItems(items)
+      : {
+          totalCalories: Math.max(0, Math.round(Number(parsed.totalCalories) || 0)),
+          protein: Math.max(0, Math.round(Number(parsed.protein) || 0)),
+          carbs: Math.max(0, Math.round(Number(parsed.carbs) || 0)),
+          fat: Math.max(0, Math.round(Number(parsed.fat) || 0)),
+        };
+
+  return {
+    mealName: String(parsed.mealName || cleanDescription),
+    totalCalories: recalculated.totalCalories,
+    protein: recalculated.protein,
+    carbs: recalculated.carbs,
+    fat: recalculated.fat,
+    items,
+    aiTip: String(
+      parsed.aiTip ||
+        'Puedes ajustar cualquier ingrediente o porción antes de guardar.'
+    ),
+    isDemo: false,
+  };
+}
+
+/**
+ * Estima automáticamente un solo ingrediente agregado manualmente en la pantalla de revisión.
+ */
+export async function estimateSingleFoodItem(
+  name: string,
+  portion: string
+): Promise<DetectedFoodItem> {
+  const apiKey = loadGeminiApiKey();
+  if (!apiKey) {
+    return estimateSingleIngredientLocally(name, portion);
+  }
+
+  try {
+    const result = await analyzeFoodDescription({
+      description: `${portion} de ${name}`.trim(),
+      category: 'comida',
+    });
+    if (result.items.length > 0) {
+      return result.items[0];
+    }
+  } catch {
+    // Fallback al motor local si falla la red o la API
+  }
+  return estimateSingleIngredientLocally(name, portion);
+}
