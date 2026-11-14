@@ -285,7 +285,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col">
+      <div className="w-full max-w-md max-h-[86dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col">
         {/* Cabecera Modal */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 backdrop-blur px-5 py-4">
           <div className="flex items-center gap-2">

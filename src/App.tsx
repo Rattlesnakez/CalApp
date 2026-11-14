@@ -73,7 +73,7 @@ export function App() {
 
   return (
     <div className="min-h-dvh bg-slate-100 flex justify-center">
-      <div className="w-full max-w-md min-h-dvh bg-slate-50 px-4 pt-4 shadow-xl shadow-slate-200/70">
+      <div className="w-full max-w-md min-h-dvh bg-slate-50 px-4 pt-safe shadow-xl shadow-slate-200/70">
         {isOnboarding ? (
           <OnboardingOrProfileView
             profile={profile}
