@@ -130,79 +130,81 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
         </p>
       </div>
 
-      {/* Tarjeta de Análisis Nutricional en Vivo */}
-      <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <Flame className="w-5 h-5" />
+      {/* Tarjeta de Análisis Nutricional en Vivo (visible después del registro inicial) */}
+      {!isInitialOnboarding && (
+        <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <Flame className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">
+                  Calorías diarias requeridas
+                </p>
+                <p className="text-2xl font-extrabold text-slate-900">
+                  {targetCalories.toLocaleString('es-MX')}{' '}
+                  <span className="text-sm font-semibold text-slate-500">
+                    kcal/día
+                  </span>
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">
-                Calorías diarias requeridas
-              </p>
-              <p className="text-2xl font-extrabold text-slate-900">
-                {targetCalories.toLocaleString('es-MX')}{' '}
-                <span className="text-sm font-semibold text-slate-500">
-                  kcal/día
-                </span>
-              </p>
-            </div>
-          </div>
-          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {GOAL_LABELS[effectiveProfile.goal].badge}
-          </span>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-slate-50 p-2.5">
-            <p className="text-[11px] text-slate-500">Basal (TMB)</p>
-            <p className="text-sm font-bold text-slate-800">{bmr} kcal</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-2.5">
-            <p className="text-[11px] text-slate-500">Gasto (TDEE)</p>
-            <p className="text-sm font-bold text-slate-800">{tdee} kcal</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-2.5">
-            <p className="text-[11px] text-slate-500">IMC ({bmi.value})</p>
-            <p className={`text-xs font-bold mt-0.5 ${bmi.colorClass}`}>
-              {bmi.category}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 p-3">
-          <div className="flex items-center justify-between text-xs text-emerald-900 font-medium">
-            <span>Rango para cumplir hoy:</span>
-            <span className="font-bold">
-              {minIdeal.toLocaleString('es-MX')} –{' '}
-              {maxIdeal.toLocaleString('es-MX')} kcal
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
+              {GOAL_LABELS[effectiveProfile.goal].badge}
             </span>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-white/80 py-1.5 px-2">
-              <span className="block text-[10px] text-slate-500">Proteínas</span>
-              <span className="text-xs font-bold text-sky-700">
-                {macros.protein} g
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-2xl bg-slate-50 p-2.5">
+              <p className="text-[11px] text-slate-500">Basal (TMB)</p>
+              <p className="text-sm font-bold text-slate-800">{bmr} kcal</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-2.5">
+              <p className="text-[11px] text-slate-500">Gasto (TDEE)</p>
+              <p className="text-sm font-bold text-slate-800">{tdee} kcal</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-2.5">
+              <p className="text-[11px] text-slate-500">IMC ({bmi.value})</p>
+              <p className={`text-xs font-bold mt-0.5 ${bmi.colorClass}`}>
+                {bmi.category}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 p-3">
+            <div className="flex items-center justify-between text-xs text-emerald-900 font-medium">
+              <span>Rango para cumplir hoy:</span>
+              <span className="font-bold">
+                {minIdeal.toLocaleString('es-MX')} –{' '}
+                {maxIdeal.toLocaleString('es-MX')} kcal
               </span>
             </div>
-            <div className="rounded-xl bg-white/80 py-1.5 px-2">
-              <span className="block text-[10px] text-slate-500">
-                Carbohidratos
-              </span>
-              <span className="text-xs font-bold text-amber-700">
-                {macros.carbs} g
-              </span>
-            </div>
-            <div className="rounded-xl bg-white/80 py-1.5 px-2">
-              <span className="block text-[10px] text-slate-500">Grasas</span>
-              <span className="text-xs font-bold text-rose-700">
-                {macros.fat} g
-              </span>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-white/80 py-1.5 px-2">
+                <span className="block text-[10px] text-slate-500">Proteínas</span>
+                <span className="text-xs font-bold text-sky-700">
+                  {macros.protein} g
+                </span>
+              </div>
+              <div className="rounded-xl bg-white/80 py-1.5 px-2">
+                <span className="block text-[10px] text-slate-500">
+                  Carbohidratos
+                </span>
+                <span className="text-xs font-bold text-amber-700">
+                  {macros.carbs} g
+                </span>
+              </div>
+              <div className="rounded-xl bg-white/80 py-1.5 px-2">
+                <span className="block text-[10px] text-slate-500">Grasas</span>
+                <span className="text-xs font-bold text-rose-700">
+                  {macros.fat} g
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Datos Personales */}
       <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80 space-y-4">
@@ -264,6 +266,7 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
               inputMode="numeric"
               min={12}
               max={100}
+              required
               value={ageInput}
               onChange={(e) => setAgeInput(e.target.value)}
               placeholder="Ej. 25"
@@ -280,6 +283,7 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
               min={30}
               max={250}
               step="any"
+              required
               value={weightInput}
               onChange={(e) => setWeightInput(e.target.value)}
               placeholder="Ej. 70"
@@ -295,6 +299,7 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
               inputMode="numeric"
               min={110}
               max={230}
+              required
               value={heightInput}
               onChange={(e) => setHeightInput(e.target.value)}
               placeholder="Ej. 170"
