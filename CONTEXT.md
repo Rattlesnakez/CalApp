@@ -54,21 +54,24 @@ CalApp/
     ├── services/
     │   └── geminiService.ts       # Cliente Gemini v1beta, compresión de fotos, FOOD_DICTIONARY y sugerencias de platillos
     └── components/
-        ├── BottomNav.tsx          # Barra inferior fija (Hoy, Platillos, Foto IA, Historial, Mi Perfil)
-        ├── DailyDashboardView.tsx # Tab "Hoy": header/fecha unificados, anillo calórico, veredicto, macros y 3 comidas
-        ├── MealSuggestionsView.tsx # Tab "Platillos": recomendaciones IA/locales por meta restante o ingredientes disponibles
-        ├── PhotoScannerModal.tsx  # Modal de registro: cámara WebRTC integrada, galería, texto manual y revisión
+        ├── BottomNav.tsx              # Barra inferior fija (Hoy, Platillos, Foto IA, Historial, Mi Perfil)
+        ├── DailyDashboardView.tsx     # Tab "Hoy": header/fecha unificados, anillo calórico, veredicto, macros y 3 comidas (con editar/eliminar)
+        ├── MealSuggestionsView.tsx    # Tab "Platillos": recomendaciones IA/locales por meta restante o ingredientes disponibles
+        ├── PhotoScannerModal.tsx      # Modal de registro y edición: cámara WebRTC, galería, texto manual y revisión editable
+        ├── DeleteMealConfirmModal.tsx # Diálogo de confirmación en español antes de eliminar un platillo registrado
         ├── OnboardingOrProfileView.tsx # Registro inicial y pestaña "Mi Perfil" (incluye configuración de API Key)
-        ├── HistoryView.tsx        # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día
-        └── ApiKeyTutorialBox.tsx  # Guía en 3 pasos para obtener una API Key gratis en Google AI Studio
+        ├── HistoryView.tsx            # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día (con editar/eliminar)
+        └── ApiKeyTutorialBox.tsx      # Guía en 3 pasos para obtener una API Key gratis en Google AI Studio
 ```
 
 ### Detalle rápido de componentes clave
 
-- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `platillos`, `historial` y `perfil`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
-- **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera y selector de fecha (`< Hoy >`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con un botón único `+ Agregar`.
+- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `platillos`, `historial` y `perfil`. Gestiona `editingEntry` para reabrir `PhotoScannerModal` precargado al editar un `MealEntry` (`handleUpdateMeal`) preservando su `id`, `date`, `timestamp` y `photoDataUrl`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
+- **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera y selector de fecha (`< Hoy >`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con botón `+ Agregar`, botón **Editar** (`Pencil`) y botón **Eliminar** (`Trash2` con confirmación previa vía `DeleteMealConfirmModal`).
+- **`src/components/HistoryView.tsx`**: resumen de 7 días, gráfica de barras y detalle por día donde también se pueden **editar** (`Pencil`) o **eliminar** (`Trash2` con `DeleteMealConfirmModal`) comidas ya registradas.
 - **`src/components/MealSuggestionsView.tsx`**: pestaña **Platillos** con dos modos: **Para mi meta de hoy** (calcula calorías y macros restantes según la hora o tiempo de comida elegido) y **Con lo que tengo** (chips/input de ingredientes disponibles, filtro opcional de comida y ajuste opcional a calorías restantes). Permite registrar cualquier sugerencia directamente como `MealEntry` en el día seleccionado.
-- **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`.
+- **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`. Cuando recibe `editingEntry` y `onUpdateMeal`, abre directamente en `review` precargado con los datos del `MealEntry`, permitiendo modificar `mealName`, categoría (`Desayuno`, `Comida`, `Cena`), cada ingrediente (`name`, `portion`, `calories`, `protein`, `carbs`, `fat`), añadir/quitar ingredientes con cálculo automático (`estimateSingleFoodItem`) o editar los totales directamente si no hay ítems.
+- **`src/components/DeleteMealConfirmModal.tsx`**: modal en español (en lugar de `window.confirm()`) que muestra el nombre del platillo, su categoría y calorías antes de confirmar **Eliminar** o **Cancelar**.
 - **`src/components/OnboardingOrProfileView.tsx`**: durante `isInitialOnboarding` oculta la tarjeta de cálculo calórico (`Calorías diarias requeridas` / IMC / macros) y muestra los campos de datos personales limpios usando `placeholder` para no obligar a borrar ejemplos previos. En `Mi Perfil` sí muestra la tarjeta resumen y permite editar o fijar una meta manual (`customCalorieTarget`).
 
 ---
@@ -147,10 +150,10 @@ Evalúa las calorías consumidas frente a `targetCalories`:
 
 ## 6. Decisiones de UX Móvil Importantes
 
-- **Safe area superior e inferior (`src/index.css`):** `.pt-safe` aplica `padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 0.85rem))` en pantallas `<= 640px` para evitar que el notch o la barra de estado de iPhone se sobrepongan al encabezado; `.pb-safe` respeta el indicador inferior en `BottomNav.tsx`. El modal limita su altura con `max-h-[86dvh]`.
+- **Safe area superior e inferior (`src/index.css`):** `.pt-safe` aplica `padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 0.85rem))` en pantallas `<= 640px` para evitar que el notch o la barra de estado de iPhone se sobrepongan al encabezado; `.pb-safe` respeta el indicador inferior en `BottomNav.tsx`, `PhotoScannerModal.tsx` y `DeleteMealConfirmModal.tsx`. Los modales limitan su altura con `max-h-[86dvh]`.
 - **Inputs sin `0` bloqueado ni ejemplos forzados (`OnboardingOrProfileView.tsx` y `PhotoScannerModal.tsx`):**
   - Los campos de **Nombre**, **Edad**, **Peso** y **Altura** mantienen estado `string` en el formulario y arrancan vacíos en el registro inicial (`isInitialOnboarding`), mostrando solo `placeholder` (`Ej. Carlos`, `Ej. 25`, `Ej. 70`, `Ej. 170`).
-  - Los inputs numéricos no convierten cadenas vacías a `Number("") -> 0` mientras se edita, permitiendo borrar por completo un número sin que quede un `0` atascado (`inputMode="decimal"` y `step="any"` en peso; `inputMode="numeric"` en edad, altura, meta manual y calorías por ingrediente).
+  - Los inputs numéricos no convierten cadenas vacías a `Number("") -> 0` mientras se edita (`itemDrafts` en `PhotoScannerModal.tsx`), permitiendo borrar por completo calorías, macros o pesos sin que quede un `0` atascado (`inputMode="decimal"` y `step="any"` en peso; `inputMode="numeric"` en edad, altura, meta manual, calorías y macros).
 
 ---
 
@@ -172,6 +175,8 @@ npm run preview  # Vista previa local del build de producción
 
 > **Regla de mantenimiento:** Actualizar `CONTEXT.md` (y `README.md` si cambian funcionalidades visibles) después de cada cambio relevante en la aplicación.
 
+- **Confirmación antes de eliminar y edición completa de comidas:** Se añadió `DeleteMealConfirmModal.tsx` para confirmar en español antes de eliminar cualquier platillo en `Hoy` (`DailyDashboardView.tsx`) e `Historial` (`HistoryView.tsx`), y se habilitó la edición completa de comidas guardadas (`mealName`, categoría, ingredientes/porciones/kcal/P-C-G y totales directos) reutilizando `PhotoScannerModal.tsx` con `editingEntry` e inputs numéricos sin `0` bloqueado (`itemDrafts`).
+- **`a28ec87` — Actualización de `CONTEXT.md` y `README.md`:** Se documentó la pestaña `Platillos` y la arquitectura de recomendaciones en `CONTEXT.md` y `README.md`.
 - **`18da971` — Pestaña `Platillos` (Recomendación de Platillos con IA):** Se añadió `MealSuggestionsView.tsx`, barra inferior de 5 botones (`Hoy`, `Platillos`, `Foto IA`, `Historial`, `Mi Perfil`), modos *"Para mi meta de hoy"* y *"Con lo que tengo"*, `generateMealSuggestions` (`gemini-4-hydrogen`, `v1beta`) y respaldo local `suggestMealsLocally`.
 - **`ee230cc` — Documentación inicial:** Se crearon `CONTEXT.md` y `README.md` en la raíz del proyecto.
 - **`adc0814` — Simplificación visual:** Se redujo la saturación en `DailyDashboardView.tsx`, `PhotoScannerModal.tsx` y `OnboardingOrProfileView.tsx` (header + fecha en 1 fila, tarjeta unificada, eliminación de botones duplicados y de la cuadrícula demo del modal).

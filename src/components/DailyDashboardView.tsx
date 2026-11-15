@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   Clock,
   Coffee,
   Moon,
+  Pencil,
   Plus,
   Sun,
   Trash2,
@@ -21,6 +22,7 @@ import {
   getLocalDateKey,
   shiftDateKey,
 } from '../utils/nutrition';
+import { DeleteMealConfirmModal } from './DeleteMealConfirmModal';
 
 interface DailyDashboardViewProps {
   profile: UserProfile;
@@ -28,6 +30,7 @@ interface DailyDashboardViewProps {
   onChangeDate: (dateKey: string) => void;
   entriesForDay: MealEntry[];
   onOpenScanner: (category: MealCategory) => void;
+  onEditEntry: (entry: MealEntry) => void;
   onDeleteEntry: (entryId: string) => void;
   hasApiKey: boolean;
 }
@@ -49,9 +52,12 @@ export const DailyDashboardView: React.FC<DailyDashboardViewProps> = ({
   onChangeDate,
   entriesForDay,
   onOpenScanner,
+  onEditEntry,
   onDeleteEntry,
   hasApiKey,
 }) => {
+  const [entryPendingDelete, setEntryPendingDelete] =
+    useState<MealEntry | null>(null);
   const targetCalories = calculateCalorieTarget(profile);
   const macroTargets = calculateMacroTargets(targetCalories, profile.goal);
 
@@ -367,14 +373,24 @@ export const DailyDashboardView: React.FC<DailyDashboardViewProps> = ({
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onDeleteEntry(entry.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 transition shrink-0"
-                        aria-label={`Eliminar ${entry.mealName}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onEditEntry(entry)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 transition"
+                          aria-label={`Editar ${entry.mealName}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEntryPendingDelete(entry)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                          aria-label={`Eliminar ${entry.mealName}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -383,6 +399,15 @@ export const DailyDashboardView: React.FC<DailyDashboardViewProps> = ({
           );
         })}
       </div>
+
+      <DeleteMealConfirmModal
+        entry={entryPendingDelete}
+        onCancel={() => setEntryPendingDelete(null)}
+        onConfirm={(entryId) => {
+          onDeleteEntry(entryId);
+          setEntryPendingDelete(null);
+        }}
+      />
     </div>
   );
 };

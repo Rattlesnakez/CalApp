@@ -37,6 +37,8 @@ interface PhotoScannerModalProps {
   hasApiKey: boolean;
   onClose: () => void;
   onSaveMeal: (entry: MealEntry) => void;
+  editingEntry?: MealEntry | null;
+  onUpdateMeal?: (entry: MealEntry) => void;
 }
 
 type ModalStep = 'choose' | 'camera' | 'manual_input' | 'analyzing' | 'review';
@@ -63,6 +65,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   hasApiKey,
   onClose,
   onSaveMeal,
+  editingEntry = null,
+  onUpdateMeal,
 }) => {
   const [category, setCategory] = useState<MealCategory>(initialCategory);
   const [step, setStep] = useState<ModalStep>('choose');
@@ -74,6 +78,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     'La IA está detectando tus alimentos...'
   );
   const [showDemoTutorial, setShowDemoTutorial] = useState<boolean>(false);
+  const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
 
   // Campos para agregar un alimento extra en revisión o entrada manual
   const [newItemName, setNewItemName] = useState('');
@@ -108,8 +113,34 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       stopCameraStream();
+      return;
     }
-  }, [isOpen, stopCameraStream]);
+    setErrorMsg('');
+    setShowAddItemForm(false);
+    setItemDrafts({});
+    if (editingEntry) {
+      stopCameraStream();
+      setCategory(editingEntry.category);
+      setPhotoPreview(editingEntry.photoDataUrl);
+      setAnalysis({
+        mealName: editingEntry.mealName,
+        totalCalories: editingEntry.totalCalories,
+        protein: editingEntry.protein,
+        carbs: editingEntry.carbs,
+        fat: editingEntry.fat,
+        items: editingEntry.items.map((it) => ({ ...it })),
+        aiTip: editingEntry.aiTip,
+        isDemo: editingEntry.isDemo,
+      });
+      setStep('review');
+    } else {
+      setCategory(initialCategory);
+      setPhotoPreview(undefined);
+      setAnalysis(null);
+      setManualText('');
+      setStep('choose');
+    }
+  }, [isOpen, editingEntry, initialCategory, stopCameraStream]);
 
   useEffect(() => {
     return () => {
@@ -129,6 +160,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isEditing = Boolean(editingEntry && onUpdateMeal);
+
   const handleCloseModal = () => {
     stopCameraStream();
     onClose();
@@ -142,6 +175,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     setErrorMsg('');
     setShowAddItemForm(false);
     setShowNativeFallback(false);
+    setItemDrafts({});
   };
 
   const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
@@ -352,36 +386,64 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     }
   };
 
-  const handleUpdateItemCalories = (index: number, nextCalories: number) => {
+  const getDraftValue = (key: string, numericValue: number): string =>
+    key in itemDrafts ? itemDrafts[key] : String(numericValue);
+
+  const parseNumericInput = (raw: string): number =>
+    raw.trim() === '' ? 0 : Math.max(0, Math.round(Number(raw) || 0));
+
+  const handleUpdateItemCalories = (index: number, rawValue: string) => {
     if (!analysis) return;
-    const safeCal = Math.max(0, Math.round(nextCalories || 0));
-    const nextItems = analysis.items.map((item, idx) => {
-      if (idx !== index) return item;
-      const ratio = item.calories > 0 ? safeCal / item.calories : 1;
-      return {
-        ...item,
-        calories: safeCal,
-        protein: Math.round(item.protein * ratio),
-        carbs: Math.round(item.carbs * ratio),
-        fat: Math.round(item.fat * ratio),
-      };
-    });
+    setItemDrafts((prev) => ({ ...prev, [`${index}_calories`]: rawValue }));
+    const safeCal = parseNumericInput(rawValue);
+    const nextItems = analysis.items.map((item, idx) =>
+      idx === index ? { ...item, calories: safeCal } : item
+    );
     const totals = recalculateTotalsFromItems(nextItems);
     setAnalysis({ ...analysis, items: nextItems, ...totals });
   };
 
-  const handleUpdateItemName = (index: number, nextName: string) => {
+  const handleUpdateItemMacro = (
+    index: number,
+    field: 'protein' | 'carbs' | 'fat',
+    rawValue: string
+  ) => {
+    if (!analysis) return;
+    setItemDrafts((prev) => ({ ...prev, [`${index}_${field}`]: rawValue }));
+    const safeVal = parseNumericInput(rawValue);
+    const nextItems = analysis.items.map((item, idx) =>
+      idx === index ? { ...item, [field]: safeVal } : item
+    );
+    const totals = recalculateTotalsFromItems(nextItems);
+    setAnalysis({ ...analysis, items: nextItems, ...totals });
+  };
+
+  const handleUpdateItemText = (
+    index: number,
+    field: 'name' | 'portion',
+    value: string
+  ) => {
     if (!analysis) return;
     const nextItems = analysis.items.map((item, idx) =>
-      idx === index ? { ...item, name: nextName } : item
+      idx === index ? { ...item, [field]: value } : item
     );
     setAnalysis({ ...analysis, items: nextItems });
+  };
+
+  const handleUpdateDirectTotal = (
+    field: 'totalCalories' | 'protein' | 'carbs' | 'fat',
+    rawValue: string
+  ) => {
+    if (!analysis) return;
+    setItemDrafts((prev) => ({ ...prev, [`total_${field}`]: rawValue }));
+    setAnalysis({ ...analysis, [field]: parseNumericInput(rawValue) });
   };
 
   const handleDeleteItem = (index: number) => {
     if (!analysis) return;
     const nextItems = analysis.items.filter((_, idx) => idx !== index);
     const totals = recalculateTotalsFromItems(nextItems);
+    setItemDrafts({});
     setAnalysis({ ...analysis, items: nextItems, ...totals });
   };
 
@@ -414,6 +476,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
     const nextItems = [...analysis.items, added];
     const totals = recalculateTotalsFromItems(nextItems);
+    setItemDrafts({});
     setAnalysis({ ...analysis, items: nextItems, ...totals });
     setNewItemName('');
     setNewItemPortion('1 porción');
@@ -424,13 +487,15 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   const handleConfirmSave = () => {
     if (!analysis) return;
     const entry: MealEntry = {
-      id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      date: selectedDate,
-      timestamp: Date.now(),
+      id:
+        editingEntry?.id ??
+        `meal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      date: editingEntry?.date ?? selectedDate,
+      timestamp: editingEntry?.timestamp ?? Date.now(),
       category,
       mealName:
         analysis.mealName.trim() || MEAL_CATEGORY_META[category].label,
-      photoDataUrl: photoPreview,
+      photoDataUrl: photoPreview ?? editingEntry?.photoDataUrl,
       totalCalories: analysis.totalCalories,
       protein: analysis.protein,
       carbs: analysis.carbs,
@@ -439,8 +504,12 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       aiTip: analysis.aiTip,
       isDemo: analysis.isDemo,
     };
-    onSaveMeal(entry);
-    onClose();
+    if (isEditing && onUpdateMeal) {
+      onUpdateMeal(entry);
+    } else {
+      onSaveMeal(entry);
+    }
+    handleCloseModal();
   };
 
   return (
@@ -458,12 +527,16 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
-                Escáner de Calorías IA
+                {isEditing
+                  ? 'Editar Comida Registrada'
+                  : 'Escáner de Calorías IA'}
               </h2>
               <p className="text-[11px] text-slate-500">
-                {hasApiKey
-                  ? 'Visión Gemini activa'
-                  : 'Modo Demo (sin API Key requerida)'}
+                {isEditing
+                  ? 'Modifica platillo, comida, porciones o macros'
+                  : hasApiKey
+                    ? 'Visión Gemini activa'
+                    : 'Modo Demo (sin API Key requerida)'}
               </p>
             </div>
           </div>
@@ -477,7 +550,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 pb-safe space-y-4">
           {/* Selector de Tiempo de Comida */}
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -802,7 +875,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               )}
 
               {/* Nombre del platillo + resumen */}
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-2">
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-2.5">
                 <label className="block text-[11px] font-bold text-emerald-800 uppercase">
                   Nombre del platillo
                 </label>
@@ -812,23 +885,100 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   onChange={(e) =>
                     setAnalysis({ ...analysis, mealName: e.target.value })
                   }
+                  placeholder="Ej. Chilaquiles verdes con pollo"
                   className="w-full rounded-xl bg-white border border-emerald-200 px-3 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
                 />
-                <div className="flex items-center justify-between pt-1">
-                  <div>
-                    <span className="text-xs text-emerald-800 font-semibold">
-                      Total detectado
-                    </span>
-                    <p className="text-2xl font-black text-emerald-950">
-                      {analysis.totalCalories} kcal
-                    </p>
+
+                {analysis.items.length === 0 ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-emerald-800 font-semibold">
+                        Totales del platillo (sin desglose)
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={getDraftValue('total_totalCalories', analysis.totalCalories)}
+                          onChange={(e) =>
+                            handleUpdateDirectTotal('totalCalories', e.target.value)
+                          }
+                          placeholder="0"
+                          aria-label="Calorías totales"
+                          className="w-24 rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5 text-base font-black text-right text-emerald-950 focus:border-emerald-600 focus:outline-none"
+                        />
+                        <span className="text-xs font-bold text-emerald-900">kcal</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          Proteína (g)
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={getDraftValue('total_protein', analysis.protein)}
+                          onChange={(e) =>
+                            handleUpdateDirectTotal('protein', e.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                        />
+                      </label>
+                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          Carbos (g)
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={getDraftValue('total_carbs', analysis.carbs)}
+                          onChange={(e) =>
+                            handleUpdateDirectTotal('carbs', e.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                        />
+                      </label>
+                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          Grasas (g)
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={getDraftValue('total_fat', analysis.fat)}
+                          onChange={(e) =>
+                            handleUpdateDirectTotal('fat', e.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                        />
+                      </label>
+                    </div>
                   </div>
-                  <div className="text-right text-xs font-semibold text-emerald-900 space-y-0.5">
-                    <p>Proteína: {analysis.protein} g</p>
-                    <p>Carbos: {analysis.carbs} g</p>
-                    <p>Grasas: {analysis.fat} g</p>
+                ) : (
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <span className="text-xs text-emerald-800 font-semibold">
+                        {isEditing ? 'Total del platillo' : 'Total detectado'}
+                      </span>
+                      <p className="text-2xl font-black text-emerald-950">
+                        {analysis.totalCalories} kcal
+                      </p>
+                    </div>
+                    <div className="text-right text-xs font-semibold text-emerald-900 space-y-0.5">
+                      <p>Proteína: {analysis.protein} g</p>
+                      <p>Carbos: {analysis.carbs} g</p>
+                      <p>Grasas: {analysis.fat} g</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {analysis.aiTip && (
@@ -841,7 +991,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Alimentos detectados ({analysis.items.length})
+                    {isEditing ? 'Ingredientes / alimentos' : 'Alimentos detectados'} ({analysis.items.length})
                   </p>
                   <button
                     type="button"
@@ -865,6 +1015,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                       />
                       <input
                         type="number"
+                        inputMode="numeric"
+                        min={0}
                         placeholder="Kcal (opcional: auto)"
                         value={newItemCalories}
                         onChange={(e) => setNewItemCalories(e.target.value)}
@@ -899,64 +1051,133 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   </div>
                 )}
 
-                {analysis.items.map((item, idx) => (
-                  <div
-                    key={`${item.name}_${idx}`}
-                    className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-2.5"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) =>
-                          handleUpdateItemName(idx, e.target.value)
-                        }
-                        className="w-full text-xs font-bold text-slate-900 bg-transparent focus:outline-none focus:underline"
-                      />
-                      <p className="text-[11px] text-slate-400">
-                        {item.portion} • P:{item.protein}g C:{item.carbs}g G:
-                        {item.fat}g
-                      </p>
+                {analysis.items.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-200 px-3.5 py-3 text-xs text-slate-500 text-center">
+                    No hay ingredientes individuales. Puedes editar los totales arriba o añadir un ingrediente.
+                  </p>
+                ) : (
+                  analysis.items.map((item, idx) => (
+                    <div
+                      key={`item_${idx}`}
+                      className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) =>
+                              handleUpdateItemText(idx, 'name', e.target.value)
+                            }
+                            placeholder="Nombre del alimento"
+                            className="w-full text-xs font-bold text-slate-900 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={item.portion}
+                            onChange={(e) =>
+                              handleUpdateItemText(idx, 'portion', e.target.value)
+                            }
+                            placeholder="Porción (ej. 150g o 1 taza)"
+                            className="w-full text-[11px] text-slate-500 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={getDraftValue(`${idx}_calories`, item.calories)}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleUpdateItemCalories(idx, e.target.value)
+                            }
+                            aria-label={`Calorías de ${item.name || 'ingrediente'}`}
+                            className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
+                          />
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            kcal
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(idx)}
+                            className="p-1 text-slate-400 hover:text-rose-600"
+                            aria-label="Quitar alimento"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                          <span className="font-bold text-slate-500">P</span>
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={getDraftValue(`${idx}_protein`, item.protein)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleUpdateItemMacro(idx, 'protein', e.target.value)
+                              }
+                              aria-label={`Proteína de ${item.name || 'ingrediente'}`}
+                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                            />
+                            <span className="text-slate-400">g</span>
+                          </div>
+                        </label>
+                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                          <span className="font-bold text-slate-500">C</span>
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={getDraftValue(`${idx}_carbs`, item.carbs)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleUpdateItemMacro(idx, 'carbs', e.target.value)
+                              }
+                              aria-label={`Carbohidratos de ${item.name || 'ingrediente'}`}
+                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                            />
+                            <span className="text-slate-400">g</span>
+                          </div>
+                        </label>
+                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                          <span className="font-bold text-slate-500">G</span>
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={getDraftValue(`${idx}_fat`, item.fat)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleUpdateItemMacro(idx, 'fat', e.target.value)
+                              }
+                              aria-label={`Grasas de ${item.name || 'ingrediente'}`}
+                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                            />
+                            <span className="text-slate-400">g</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        value={item.calories === 0 ? '' : item.calories}
-                        placeholder="0"
-                        onChange={(e) =>
-                          handleUpdateItemCalories(
-                            idx,
-                            e.target.value === '' ? 0 : Number(e.target.value)
-                          )
-                        }
-                        className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-right text-slate-900"
-                      />
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        kcal
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteItem(idx)}
-                        className="p-1 text-slate-400 hover:text-rose-600"
-                        aria-label="Quitar alimento"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               {/* Botones finales */}
               <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={handleResetToChoose}
+                  onClick={isEditing ? handleCloseModal : handleResetToChoose}
                   className="rounded-2xl border border-slate-200 px-4 py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
                 >
-                  {photoPreview ? 'Cambiar foto' : 'Volver'}
+                  {isEditing ? 'Cancelar' : photoPreview ? 'Cambiar foto' : 'Volver'}
                 </button>
                 <button
                   type="button"
@@ -964,7 +1185,9 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   className="flex-1 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition"
                 >
                   <Check className="w-4 h-4" />
-                  Guardar en {MEAL_CATEGORY_META[category].label}
+                  {isEditing
+                    ? `Guardar cambios en ${MEAL_CATEGORY_META[category].label}`
+                    : `Guardar en ${MEAL_CATEGORY_META[category].label}`}
                 </button>
               </div>
             </div>

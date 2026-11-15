@@ -25,6 +25,7 @@ export function App() {
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
   const [scannerCategory, setScannerCategory] =
     useState<MealCategory>('desayuno');
+  const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean>(
     () => loadGeminiApiKey().length > 0
   );
@@ -47,6 +48,7 @@ export function App() {
   };
 
   const handleOpenScanner = (category?: MealCategory) => {
+    setEditingEntry(null);
     if (category) {
       setScannerCategory(category);
     } else {
@@ -58,8 +60,26 @@ export function App() {
     setScannerOpen(true);
   };
 
+  const handleStartEditEntry = (entry: MealEntry) => {
+    setScannerCategory(entry.category);
+    setEditingEntry(entry);
+    setScannerOpen(true);
+  };
+
+  const handleCloseScanner = () => {
+    setScannerOpen(false);
+    setEditingEntry(null);
+  };
+
   const handleSaveMeal = (entry: MealEntry) => {
     setEntries((prev) => [entry, ...prev]);
+  };
+
+  const handleUpdateMeal = (updatedEntry: MealEntry) => {
+    setEntries((prev) =>
+      prev.map((item) => (item.id === updatedEntry.id ? updatedEntry : item))
+    );
+    setEditingEntry(null);
   };
 
   const handleDeleteEntry = (entryId: string) => {
@@ -90,6 +110,7 @@ export function App() {
                 onChangeDate={setSelectedDate}
                 entriesForDay={entriesForSelectedDate}
                 onOpenScanner={handleOpenScanner}
+                onEditEntry={handleStartEditEntry}
                 onDeleteEntry={handleDeleteEntry}
                 hasApiKey={hasApiKey}
               />
@@ -113,6 +134,8 @@ export function App() {
                   setSelectedDate(dateKey);
                   setActiveTab('hoy');
                 }}
+                onEditEntry={handleStartEditEntry}
+                onDeleteEntry={handleDeleteEntry}
               />
             )}
 
@@ -136,8 +159,10 @@ export function App() {
                 initialCategory={scannerCategory}
                 selectedDate={selectedDate}
                 hasApiKey={hasApiKey}
-                onClose={() => setScannerOpen(false)}
+                editingEntry={editingEntry}
+                onClose={handleCloseScanner}
                 onSaveMeal={handleSaveMeal}
+                onUpdateMeal={handleUpdateMeal}
               />
             )}
           </>

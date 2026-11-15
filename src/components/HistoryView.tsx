@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   Clock,
   Flame,
+  Pencil,
+  Trash2,
   TrendingUp,
 } from 'lucide-react';
 import type { MealEntry, UserProfile } from '../types';
@@ -16,21 +18,28 @@ import {
   getLocalDateKey,
   shiftDateKey,
 } from '../utils/nutrition';
+import { DeleteMealConfirmModal } from './DeleteMealConfirmModal';
 
 interface HistoryViewProps {
   profile: UserProfile;
   allEntries: MealEntry[];
   onSelectDateInDashboard: (dateKey: string) => void;
+  onEditEntry: (entry: MealEntry) => void;
+  onDeleteEntry: (entryId: string) => void;
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   profile,
   allEntries,
   onSelectDateInDashboard,
+  onEditEntry,
+  onDeleteEntry,
 }) => {
   const targetCalories = calculateCalorieTarget(profile);
   const todayKey = getLocalDateKey();
   const [focusedDate, setFocusedDate] = useState<string>(todayKey);
+  const [entryPendingDelete, setEntryPendingDelete] =
+    useState<MealEntry | null>(null);
 
   const last7Days = useMemo(() => {
     const days = [];
@@ -258,17 +267,37 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             {focusedDayData.entries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2.5 text-xs"
+                className="flex items-center justify-between gap-2 rounded-2xl border border-slate-100 px-3 py-2.5 text-xs"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <span className="inline-block text-[10px] font-bold uppercase text-emerald-700">
                     {MEAL_CATEGORY_META[entry.category].label}
                   </span>
-                  <p className="font-bold text-slate-800">{entry.mealName}</p>
+                  <p className="font-bold text-slate-800 truncate">
+                    {entry.mealName}
+                  </p>
                 </div>
-                <span className="font-extrabold text-slate-900">
-                  {entry.totalCalories} kcal
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="font-extrabold text-slate-900 mr-1">
+                    {entry.totalCalories} kcal
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onEditEntry(entry)}
+                    className="p-1.5 text-slate-400 hover:text-emerald-600 transition"
+                    aria-label={`Editar ${entry.mealName}`}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryPendingDelete(entry)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                    aria-label={`Eliminar ${entry.mealName}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -278,6 +307,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           </p>
         )}
       </div>
+
+      <DeleteMealConfirmModal
+        entry={entryPendingDelete}
+        onCancel={() => setEntryPendingDelete(null)}
+        onConfirm={(entryId) => {
+          onDeleteEntry(entryId);
+          setEntryPendingDelete(null);
+        }}
+      />
     </div>
   );
 };
