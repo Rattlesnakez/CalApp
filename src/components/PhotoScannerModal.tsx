@@ -578,60 +578,41 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               </div>
 
               {!hasApiKey && (
-                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-900 space-y-2">
-                  <div>
-                    <strong>Modo Demo activo:</strong> si tomas o subes una
-                    foto sin API Key de Gemini, se mostrará un análisis de
-                    ejemplo editable. Puedes conectar tu clave real en{' '}
-                    <strong>Mi Perfil</strong>.
+                <div className="rounded-2xl bg-amber-50/90 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-900 space-y-2">
+                  <p>
+                    <strong>Modo Demo activo:</strong> conecta tu API Key en{' '}
+                    <strong>Mi Perfil</strong> para análisis real con Gemini.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowDemoTutorial((v) => !v)}
+                      className="inline-flex items-center gap-1 font-bold text-emerald-800 underline hover:text-emerald-900"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                      {showDemoTutorial
+                        ? 'Ocultar guía de API Key'
+                        : 'Ver cómo obtener API Key'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleRunDemoTemplate(DEMO_MEAL_TEMPLATES[0].id)
+                      }
+                      className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-950"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      Probar 1 ejemplo rápido
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowDemoTutorial((v) => !v)}
-                    className="inline-flex items-center gap-1 font-bold text-emerald-800 underline hover:text-emerald-900"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 shrink-0" />
-                    {showDemoTutorial
-                      ? 'Ocultar guía de API Key'
-                      : 'Ver cómo obtener mi API Key gratis'}
-                  </button>
                   {showDemoTutorial && <ApiKeyTutorialBox />}
                 </div>
               )}
 
-              {/* Fotos Demo de Prueba Rápida */}
-              <div className="pt-1">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Probar Foto Demo IA al instante
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {DEMO_MEAL_TEMPLATES.map((tpl) => (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => handleRunDemoTemplate(tpl.id)}
-                      className="text-left rounded-2xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 p-2.5 transition"
-                    >
-                      <span className="inline-block rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-100 mb-1">
-                        {MEAL_CATEGORY_META[tpl.category].label}
-                      </span>
-                      <p className="text-xs font-bold text-slate-800 leading-snug">
-                        {tpl.title}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {tpl.subtitle}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <button
                 type="button"
                 onClick={handleStartManualEntry}
-                className="w-full rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-3.5 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 transition"
               >
                 <Edit3 className="w-4 h-4 text-slate-500" />
                 Escribir comida manualmente (cálculo automático)
