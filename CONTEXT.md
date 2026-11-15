@@ -1,0 +1,149 @@
+# CONTEXT.md — CalApp IA
+
+Documento de contexto técnico y funcional de **CalApp IA**, una aplicación web progresiva (PWA) móvil en español para contar calorías con análisis nutricional por fotografía, cálculo automático de comidas escritas manualmente y evaluación diaria de cumplimiento calórico.
+
+---
+
+## 1. Visión General y Enlaces
+
+- **Repositorio GitHub:** https://github.com/Rattlesnakez/CalApp (rama principal: `main`, publicación estática en `gh-pages`)
+- **App publicada (GitHub Pages):** https://rattlesnakez.github.io/CalApp/
+- **Objetivo del producto:**
+  1. Calcular las calorías y macronutrientes diarios requeridos a partir de los datos personales del usuario y su objetivo.
+  2. Registrar alimentos en tres tiempos de comida: **Desayuno**, **Comida** y **Cena**.
+  3. Detectar calorías y macros por **fotografía** (usando cámara integrada en la app o galería con Gemini Vision, más un Modo Demo sin costo) y mediante **entrada manual en texto** con estimación automática.
+  4. Mostrar un **veredicto diario** claro indicando si el usuario **Cumplió**, **No cumplió** o **Excedió** sus calorías necesarias, junto con un historial semanal de 7 días.
+  5. Guardar todo localmente en el dispositivo (`localStorage`) sin requerir backend ni cuentas externas.
+
+---
+
+## 2. Stack Tecnológico
+
+Definido en `package.json` y `vite.config.ts`:
+
+- **Framework UI:** React `^19.1.0` + TypeScript `~5.8.0` (`strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`)
+- **Bundler:** Vite `^6.3.0` (`base: './'` en `vite.config.ts` para funcionar bajo subruta de GitHub Pages `/CalApp/`)
+- **Estilos:** Tailwind CSS `^4.1.0` (`@tailwindcss/vite`)
+- **Iconografía:** `lucide-react` `^0.511.0`
+- **IA Generativa:** `@google/genai` `^3.2.0` (`GoogleGenAI` usando el endpoint `interactions.create` en versión `v1beta` con modelo `gemini-4-hydrogen`)
+- **Persistencia:** `window.localStorage`
+
+---
+
+## 3. Arquitectura y Mapa de Archivos
+
+```text
+CalApp/
+├── .github/workflows/deploy.yml   # Build automático (Node 22) y push de dist/ a rama gh-pages
+├── public/
+│   ├── manifest.json              # Configuración PWA móvil
+│   ├── icon.svg                   # Ícono de la aplicación
+│   └── .nojekyll                  # Evita procesamiento Jekyll en GitHub Pages
+├── index.html                     # Entrada HTML con meta tags PWA / viewport móvil
+├── vite.config.ts                 # Configuración Vite (base: './')
+└── src/
+    ├── main.tsx                   # Punto de montaje React
+    ├── App.tsx                    # Estado raíz (perfil, entradas, fecha seleccionada, tab activo y modal)
+    ├── index.css                  # Tailwind v4 + animación scanBeam + utilidades .pt-safe / .pb-safe
+    ├── types.ts                   # Tipos TypeScript de perfil, comidas, análisis IA y evaluación diaria
+    ├── vite-env.d.ts              # Declaraciones Vite client (ImportMeta.env)
+    ├── utils/
+    │   ├── nutrition.ts           # Fórmulas Mifflin-St Jeor, TDEE, IMC, macros, evaluateDailyStatus y fechas
+    │   └── storage.ts             # Persistencia localStorage con compactación ante límite de cuota
+    ├── services/
+    │   └── geminiService.ts       # Cliente Gemini v1beta, compresión de fotos, Modo Demo y FOOD_DICTIONARY local
+    └── components/
+        ├── BottomNav.tsx          # Barra inferior fija (Hoy, Foto IA, Historial, Mi Perfil)
+        ├── DailyDashboardView.tsx # Tab "Hoy": header/fecha unificados, anillo calórico, veredicto, macros y 3 comidas
+        ├── PhotoScannerModal.tsx  # Modal de registro: cámara WebRTC integrada, galería, texto manual y revisión
+        ├── OnboardingOrProfileView.tsx # Registro inicial y pestaña "Mi Perfil" (incluye configuración de API Key)
+        ├── HistoryView.tsx        # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día
+        └── ApiKeyTutorialBox.tsx  # Guía en 3 pasos para obtener una API Key gratis en Google AI Studio
+```
+
+### Detalle rápido de componentes clave
+
+- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `historial` y `perfil`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
+- **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera y selector de fecha (`< Hoy >`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con un botón único `+ Agregar`.
+- **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`.
+- **`src/components/OnboardingOrProfileView.tsx`**: durante `isInitialOnboarding` oculta la tarjeta de cálculo calórico (`Calorías diarias requeridas` / IMC / macros) y muestra los campos de datos personales limpios usando `placeholder` para no obligar a borrar ejemplos previos. En `Mi Perfil` sí muestra la tarjeta resumen y permite editar o fijar una meta manual (`customCalorieTarget`).
+
+---
+
+## 4. Reglas de Negocio y Fórmulas (`src/utils/nutrition.ts`)
+
+### Cálculo de calorías requeridas y macros
+- **TMB (Mifflin-St Jeor, `calculateBMR`):**
+  - Hombre: `10 * pesoKg + 6.25 * alturaCm - 5 * edad + 5`
+  - Mujer: `10 * pesoKg + 6.25 * alturaCm - 5 * edad - 161`
+- **TDEE (`calculateTDEE`):** `TMB * factorActividad`
+  - `sedentary`: `1.2`, `light`: `1.375`, `moderate`: `1.55`, `active`: `1.725`, `very_active`: `1.9`
+- **Meta diaria (`calculateCalorieTarget`):**
+  - Si existe `customCalorieTarget >= 800`, usa ese valor manual.
+  - `lose` (Perder grasa / Déficit): `max(1200, TDEE - 500)`
+  - `maintain` (Mantener peso / Equilibrio): `TDEE`
+  - `gain` (Ganar músculo / Superávit): `TDEE + 350`
+- **Reparto por comida (`MEAL_CATEGORY_META`):**
+  - **Desayuno:** `30%` (`0.3`)
+  - **Comida:** `40%` (`0.4`)
+  - **Cena:** `30%` (`0.3`)
+- **Macronutrientes (`calculateMacroTargets`):**
+  - `lose`: `32%` proteína, `38%` carbos, `30%` grasa
+  - `maintain`: `28%` proteína, `44%` carbos, `28%` grasa
+  - `gain`: `28%` proteína, `47%` carbos, `25%` grasa
+  - Conversión a gramos: proteína y carbos `kcal / 4`, grasa `kcal / 9`.
+
+### Veredicto diario (`evaluateDailyStatus`)
+Evalúa las calorías consumidas frente a `targetCalories`:
+- **Rango ideal:** entre `90%` (`minIdeal`) y `105%` (`maxIdeal`) de la meta diaria.
+- **`no_cumplio` (`No cumplió`):** `< 90%` de la meta.
+- **`cumplio` (`Cumplió`):** entre `90%` y `105%` inclusive.
+- **`excedio` (`Excedió`):** `> 105%` de la meta.
+
+---
+
+## 5. Integración de IA, Cámara y Persistencia
+
+### Google Gemini API (`src/services/geminiService.ts`)
+- **Modelo usado:** `gemini-4-hydrogen`.
+- **Importante — Versión `v1beta`:** Tanto `analyzeFoodPhoto` como `analyzeFoodDescription` instancian `new GoogleGenAI({ apiKey, apiVersion: 'v1beta' })` y pasan `api_version: 'v1beta'` en `ai.interactions.create(...)`. La versión por defecto (`v1`) del SDK `@google/genai` rechaza entradas de imagen (`{ type: 'image', data, mime_type }`) con error `400`.
+- **Salida estructurada:** Se solicita JSON validado con `mealAnalysisJsonSchema` (`mealName`, `totalCalories`, `protein`, `carbs`, `fat`, `aiTip`, `items[]`) y se recalculan totales con `recalculateTotalsFromItems` cuando hay ingredientes detectados.
+- **Modo Demo y cálculo manual sin API Key:**
+  - Si no hay API Key configurada, `analyzeFoodPhoto` usa `DEMO_MEAL_TEMPLATES` editables y `analyzeFoodDescription` / `estimateSingleFoodItem` usan `estimateFoodFromTextLocally` apoyado en `FOOD_DICTIONARY` (tabla local de alimentos frecuentes en español con detección de gramos/mililitros, fracciones y unidades).
+  - La API Key del usuario se obtiene con el tutorial de `ApiKeyTutorialBox` (`https://aistudio.google.com/apikey`) y se guarda localmente en `localStorage` bajo `calapp_gemini_api_key` (con fallback a `VITE_GEMINI_API_KEY`).
+
+### Cámara integrada en vivo (`src/components/PhotoScannerModal.tsx`)
+- **WebRTC (`getUserMedia`):** Al tocar **Tomar Foto**, abre `step === 'camera'` dentro del mismo modal usando `navigator.mediaDevices.getUserMedia` con `<video autoPlay playsInline muted>`.
+- Permite alternar entre cámara trasera (`environment`) y frontal (`user`), encuadrar el platillo con guías visuales y capturar en `<canvas>` (lado máximo `1024px`, JPEG calidad `0.82`).
+- Detiene todos los `MediaStreamTrack` (`stopCameraStream`) al capturar, volver atrás o cerrar el modal.
+- Si el navegador bloquea permisos o no soporta `getUserMedia`, muestra el botón de respaldo conectado al input nativo `<input type="file" accept="image/*" capture="environment">`.
+- Subir fotos desde galería usa `compressImageToDataUrl` (máximo `800px` de ancho, JPEG `0.78`).
+
+### Almacenamiento local (`src/utils/storage.ts`)
+- Claves en `localStorage`:
+  - `calapp_user_profile_v1`: perfil `UserProfile` (`onboardingCompleted: false` por defecto).
+  - `calapp_meal_entries_v1`: arreglo de `MealEntry`. Si se alcanza la cuota del navegador por almacenar muchas imágenes en DataURL, `saveMealEntries` recorta `photoDataUrl` de las entradas más antiguas automáticamente.
+  - `calapp_gemini_api_key`: clave personal de Google AI Studio.
+
+---
+
+## 6. Decisiones de UX Móvil Importantes
+
+- **Safe area superior e inferior (`src/index.css`):** `.pt-safe` aplica `padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 0.85rem))` en pantallas `<= 640px` para evitar que el notch o la barra de estado de iPhone se sobrepongan al encabezado; `.pb-safe` respeta el indicador inferior en `BottomNav.tsx`. El modal limita su altura con `max-h-[86dvh]`.
+- **Inputs sin `0` bloqueado ni ejemplos forzados (`OnboardingOrProfileView.tsx` y `PhotoScannerModal.tsx`):**
+  - Los campos de **Nombre**, **Edad**, **Peso** y **Altura** mantienen estado `string` en el formulario y arrancan vacíos en el registro inicial (`isInitialOnboarding`), mostrando solo `placeholder` (`Ej. Carlos`, `Ej. 25`, `Ej. 70`, `Ej. 170`).
+  - Los inputs numéricos no convierten cadenas vacías a `Number("") -> 0` mientras se edita, permitiendo borrar por completo un número sin que quede un `0` atascado (`inputMode="decimal"` y `step="any"` en peso; `inputMode="numeric"` en edad, altura, meta manual y calorías por ingrediente).
+
+---
+
+## 7. Comandos y Despliegue
+
+```bash
+npm install      # Instalar dependencias
+npm run dev      # Servidor local de desarrollo Vite
+npm run build    # Verificación TypeScript (tsc -b) + build de producción en dist/
+npm run preview  # Vista previa local del build de producción
+```
+
+- **Despliegue continuo:** El workflow `.github/workflows/deploy.yml` se ejecuta automáticamente en cada push a `main`, corre `npm ci` + `npm run build` con Node `22` y publica el contenido de `dist/` en la rama `gh-pages`.
+- **Nota operativa:** Evitar hacer `git push` manual directo a `gh-pages` inmediatamente después de empujar a `main`, ya que `deploy.yml` ya publica en `gh-pages` y dos ejecuciones simultáneas pueden quedar en cola en GitHub Pages.
