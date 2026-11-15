@@ -64,4 +64,36 @@ export interface DailyEvaluation {
   maxIdeal: number;
 }
 
-export type AppTab = 'hoy' | 'historial' | 'perfil';
+export type AppTab = 'hoy' | 'platillos' | 'historial' | 'perfil';
+
+export type SuggestionMode = 'goal' | 'pantry';
+
+export type PantryCategoryFilter = 'any' | MealCategory;
+
+export interface SuggestedMeal {
+  id: string;
+  mealName: string;
+  category: MealCategory;
+  totalCalories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: string[];
+  matchedIngredients?: string[];
+  extraIngredients?: string[];
+  preparationTip: string;
+  fitReason: string;
+  isDemo?: boolean;
+}
+
+export interface MealSuggestionRequest {
+  mode: SuggestionMode;
+  profile: UserProfile;
+  remainingCalories: number;
+  remainingMacros: { protein: number; carbs: number; fat: number };
+  targetCategory: MealCategory;
+  pantryCategoryFilter?: PantryCategoryFilter;
+  pantryIngredients?: string[];
+  adjustToRemainingCalories?: boolean;
+  variationSeed?: number;
+}

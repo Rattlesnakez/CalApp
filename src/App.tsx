@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BottomNav } from './components/BottomNav';
 import { DailyDashboardView } from './components/DailyDashboardView';
 import { HistoryView } from './components/HistoryView';
+import { MealSuggestionsView } from './components/MealSuggestionsView';
 import { OnboardingOrProfileView } from './components/OnboardingOrProfileView';
 import { PhotoScannerModal } from './components/PhotoScannerModal';
 import type { AppTab, MealCategory, MealEntry, UserProfile } from './types';
@@ -91,6 +92,16 @@ export function App() {
                 onOpenScanner={handleOpenScanner}
                 onDeleteEntry={handleDeleteEntry}
                 hasApiKey={hasApiKey}
+              />
+            )}
+
+            {activeTab === 'platillos' && (
+              <MealSuggestionsView
+                profile={profile}
+                selectedDate={selectedDate}
+                entriesForDay={entriesForSelectedDate}
+                hasApiKey={hasApiKey}
+                onSaveMeal={handleSaveMeal}
               />
             )}
 

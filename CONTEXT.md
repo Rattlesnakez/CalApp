@@ -51,10 +51,11 @@ CalApp/
     │   ├── nutrition.ts           # Fórmulas Mifflin-St Jeor, TDEE, IMC, macros, evaluateDailyStatus y fechas
     │   └── storage.ts             # Persistencia localStorage con compactación ante límite de cuota
     ├── services/
-    │   └── geminiService.ts       # Cliente Gemini v1beta, compresión de fotos, Modo Demo y FOOD_DICTIONARY local
+    │   └── geminiService.ts       # Cliente Gemini v1beta, compresión de fotos, FOOD_DICTIONARY y sugerencias de platillos
     └── components/
-        ├── BottomNav.tsx          # Barra inferior fija (Hoy, Foto IA, Historial, Mi Perfil)
+        ├── BottomNav.tsx          # Barra inferior fija (Hoy, Platillos, Foto IA, Historial, Mi Perfil)
         ├── DailyDashboardView.tsx # Tab "Hoy": header/fecha unificados, anillo calórico, veredicto, macros y 3 comidas
+        ├── MealSuggestionsView.tsx # Tab "Platillos": recomendaciones IA/locales por meta restante o ingredientes disponibles
         ├── PhotoScannerModal.tsx  # Modal de registro: cámara WebRTC integrada, galería, texto manual y revisión
         ├── OnboardingOrProfileView.tsx # Registro inicial y pestaña "Mi Perfil" (incluye configuración de API Key)
         ├── HistoryView.tsx        # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día
@@ -63,8 +64,9 @@ CalApp/
 
 ### Detalle rápido de componentes clave
 
-- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `historial` y `perfil`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
+- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `platillos`, `historial` y `perfil`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
 - **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera y selector de fecha (`< Hoy >`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con un botón único `+ Agregar`.
+- **`src/components/MealSuggestionsView.tsx`**: pestaña **Platillos** con dos modos: **Para mi meta de hoy** (calcula calorías y macros restantes según la hora o tiempo de comida elegido) y **Con lo que tengo** (chips/input de ingredientes disponibles, filtro opcional de comida y ajuste opcional a calorías restantes). Permite registrar cualquier sugerencia directamente como `MealEntry` en el día seleccionado.
 - **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`.
 - **`src/components/OnboardingOrProfileView.tsx`**: durante `isInitialOnboarding` oculta la tarjeta de cálculo calórico (`Calorías diarias requeridas` / IMC / macros) y muestra los campos de datos personales limpios usando `placeholder` para no obligar a borrar ejemplos previos. En `Mi Perfil` sí muestra la tarjeta resumen y permite editar o fijar una meta manual (`customCalorieTarget`).
 
@@ -106,10 +108,10 @@ Evalúa las calorías consumidas frente a `targetCalories`:
 
 ### Google Gemini API (`src/services/geminiService.ts`)
 - **Modelo usado:** `gemini-4-hydrogen`.
-- **Importante — Versión `v1beta`:** Tanto `analyzeFoodPhoto` como `analyzeFoodDescription` instancian `new GoogleGenAI({ apiKey, apiVersion: 'v1beta' })` y pasan `api_version: 'v1beta'` en `ai.interactions.create(...)`. La versión por defecto (`v1`) del SDK `@google/genai` rechaza entradas de imagen (`{ type: 'image', data, mime_type }`) con error `400`.
-- **Salida estructurada:** Se solicita JSON validado con `mealAnalysisJsonSchema` (`mealName`, `totalCalories`, `protein`, `carbs`, `fat`, `aiTip`, `items[]`) y se recalculan totales con `recalculateTotalsFromItems` cuando hay ingredientes detectados.
+- **Importante — Versión `v1beta`:** `analyzeFoodPhoto`, `analyzeFoodDescription` y `generateMealSuggestions` instancian `new GoogleGenAI({ apiKey, apiVersion: 'v1beta' })` y pasan `api_version: 'v1beta'` en `ai.interactions.create(...)`. La versión por defecto (`v1`) del SDK `@google/genai` rechaza entradas de imagen (`{ type: 'image', data, mime_type }`) con error `400`.
+- **Salida estructurada:** Se solicita JSON validado con `mealAnalysisJsonSchema` (`mealName`, `totalCalories`, `protein`, `carbs`, `fat`, `aiTip`, `items[]`) y `mealSuggestionsJsonSchema` (`suggestions[]` para 3 platillos recomendados), recalculando totales con `recalculateTotalsFromItems` cuando hay ingredientes detectados.
 - **Modo Demo y cálculo manual sin API Key:**
-  - Si no hay API Key configurada, `analyzeFoodPhoto` usa `DEMO_MEAL_TEMPLATES` editables y `analyzeFoodDescription` / `estimateSingleFoodItem` usan `estimateFoodFromTextLocally` apoyado en `FOOD_DICTIONARY` (tabla local de alimentos frecuentes en español con detección de gramos/mililitros, fracciones y unidades).
+  - Si no hay API Key configurada, `analyzeFoodPhoto` usa `DEMO_MEAL_TEMPLATES` editables, `analyzeFoodDescription` / `estimateSingleFoodItem` usan `estimateFoodFromTextLocally` apoyado en `FOOD_DICTIONARY` (tabla local de alimentos frecuentes en español con detección de gramos/mililitros, fracciones y unidades) y `generateMealSuggestions` utiliza el catálogo y motor local `suggestMealsLocally`.
   - La API Key del usuario se obtiene con el tutorial de `ApiKeyTutorialBox` (`https://aistudio.google.com/apikey`) y se guarda localmente en `localStorage` bajo `calapp_gemini_api_key` (con fallback a `VITE_GEMINI_API_KEY`).
 
 ### Cámara integrada en vivo (`src/components/PhotoScannerModal.tsx`)

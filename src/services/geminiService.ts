@@ -3,7 +3,11 @@ import type {
   DetectedFoodItem,
   MealAnalysisResult,
   MealCategory,
+  MealSuggestionRequest,
+  SuggestedMeal,
+  UserProfile,
 } from '../types';
+import { GOAL_LABELS, MEAL_CATEGORY_META } from '../utils/nutrition';
 import { loadGeminiApiKey } from '../utils/storage';
 
 export interface CompressedImage {
@@ -1223,4 +1227,686 @@ export async function estimateSingleFoodItem(
     // Fallback al motor local si falla la red o la API
   }
   return estimateSingleIngredientLocally(name, portion);
+}
+
+/* ========================================================================== */
+/* Recomendación de Platillos con IA (y respaldo local sin API Key)           */
+/* ========================================================================== */
+
+const mealSuggestionsJsonSchema = {
+  type: 'object',
+  properties: {
+    suggestions: {
+      type: 'array',
+      description: 'Exactamente 3 platillos recomendados en español.',
+      items: {
+        type: 'object',
+        properties: {
+          mealName: {
+            type: 'string',
+            description: 'Nombre atractivo y claro del platillo en español.',
+          },
+          category: {
+            type: 'string',
+            enum: ['desayuno', 'comida', 'cena'],
+            description: 'Tiempo de comida recomendado.',
+          },
+          totalCalories: {
+            type: 'integer',
+            description: 'Calorías totales aproximadas en kcal.',
+          },
+          protein: {
+            type: 'number',
+            description: 'Gramos de proteína.',
+          },
+          carbs: {
+            type: 'number',
+            description: 'Gramos de carbohidratos.',
+          },
+          fat: {
+            type: 'number',
+            description: 'Gramos de grasa.',
+          },
+          ingredients: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Lista de 3 a 6 ingredientes con porción casera o gramos.',
+          },
+          matchedIngredients: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Ingredientes de la lista del usuario aprovechados en este platillo.',
+          },
+          extraIngredients: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Ingredientes básicos adicionales que necesitaría además de los propios.',
+          },
+          preparationTip: {
+            type: 'string',
+            description: 'Instrucción rápida y práctica de preparación en 1-2 frases.',
+          },
+          fitReason: {
+            type: 'string',
+            description: 'Explicación breve de por qué encaja con su meta y calorías.',
+          },
+        },
+        required: [
+          'mealName',
+          'category',
+          'totalCalories',
+          'protein',
+          'carbs',
+          'fat',
+          'ingredients',
+          'matchedIngredients',
+          'extraIngredients',
+          'preparationTip',
+          'fitReason',
+        ],
+      },
+    },
+  },
+  required: ['suggestions'],
+};
+
+interface LocalMealTemplate {
+  id: string;
+  mealName: string;
+  category: MealCategory;
+  totalCalories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: string[];
+  keywords: string[];
+  preparationTip: string;
+  bestForGoals: Array<UserProfile['goal']>;
+}
+
+const LOCAL_SUGGESTED_MEALS: LocalMealTemplate[] = [
+  // DESAYUNOS
+  {
+    id: 'local_des_1',
+    mealName: 'Omelette de claras y huevo con espinaca y panela',
+    category: 'desayuno',
+    totalCalories: 360,
+    protein: 29,
+    carbs: 18,
+    fat: 18,
+    ingredients: ['2 huevos + 2 claras', '1 taza de espinaca', '40 g de queso panela', '1 tortilla de maíz'],
+    keywords: ['huevo', 'claras', 'espinaca', 'queso', 'panela', 'tortilla'],
+    preparationTip: 'Saltea la espinaca 1 minuto, vierte los huevos batidos con el queso panela y sirve con tortilla caliente.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_des_2',
+    mealName: 'Avena tibia con leche, plátano y crema de cacahuate',
+    category: 'desayuno',
+    totalCalories: 490,
+    protein: 19,
+    carbs: 68,
+    fat: 15,
+    ingredients: ['1/2 taza de avena', '1 taza de leche', '1 plátano', '1 cda de crema de cacahuate', 'canela'],
+    keywords: ['avena', 'leche', 'platano', 'crema de cacahuate', 'cacahuate', 'canela'],
+    preparationTip: 'Cocina la avena con leche 4 minutos, sirve con plátano en rodajas y crema de cacahuate encima.',
+    bestForGoals: ['gain', 'maintain'],
+  },
+  {
+    id: 'local_des_3',
+    mealName: 'Tostadas de aguacate con huevo estrellado',
+    category: 'desayuno',
+    totalCalories: 410,
+    protein: 19,
+    carbs: 34,
+    fat: 22,
+    ingredients: ['2 rebanadas de pan tostado', '1/2 aguacate', '2 huevos', 'jitomate y limón'],
+    keywords: ['pan', 'tostado', 'aguacate', 'huevo', 'jitomate'],
+    preparationTip: 'Unta el aguacate machacado con limón sobre el pan tostado y corona con los huevos.',
+    bestForGoals: ['maintain', 'lose'],
+  },
+  {
+    id: 'local_des_4',
+    mealName: 'Molletes ligeros con frijoles y queso panela',
+    category: 'desayuno',
+    totalCalories: 440,
+    protein: 23,
+    carbs: 52,
+    fat: 14,
+    ingredients: ['1 bolillo integral sin migajón', '1/2 taza de frijoles', '60 g de queso panela', 'pico de gallo'],
+    keywords: ['bolillo', 'pan', 'frijol', 'frijoles', 'queso', 'panela', 'jitomate'],
+    preparationTip: 'Unta frijoles en el pan, agrega panela y gratina 3 minutos; termina con pico de gallo fresco.',
+    bestForGoals: ['maintain', 'gain'],
+  },
+  {
+    id: 'local_des_5',
+    mealName: 'Yogur griego con fruta fresca y almendras',
+    category: 'desayuno',
+    totalCalories: 310,
+    protein: 22,
+    carbs: 30,
+    fat: 11,
+    ingredients: ['1 taza de yogur griego natural', '1 manzana o fresas', '15 g de almendras o nueces'],
+    keywords: ['yogur', 'yogurt', 'manzana', 'fresas', 'almendra', 'nuez', 'fruta'],
+    preparationTip: 'Mezcla el yogur frío con la fruta picada y corona con las almendras troceadas.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_des_6',
+    mealName: 'Huevos revueltos con jamón y chilaquiles ligeros',
+    category: 'desayuno',
+    totalCalories: 560,
+    protein: 31,
+    carbs: 54,
+    fat: 23,
+    ingredients: ['2 huevos', '60 g de jamón de pavo', '2 tortillas horneadas', 'salsa verde', '30 g de queso'],
+    keywords: ['huevo', 'jamon', 'tortilla', 'chilaquiles', 'queso', 'salsa'],
+    preparationTip: 'Baña tortillas horneadas en salsa verde caliente y acompaña con huevos revueltos con jamón.',
+    bestForGoals: ['gain', 'maintain'],
+  },
+
+  // COMIDAS
+  {
+    id: 'local_com_1',
+    mealName: 'Pechuga a la plancha con arroz y ensalada fresca',
+    category: 'comida',
+    totalCalories: 560,
+    protein: 48,
+    carbs: 52,
+    fat: 15,
+    ingredients: ['160 g de pechuga de pollo', '1 taza de arroz cocido', 'ensalada mixta', '1/3 de aguacate'],
+    keywords: ['pollo', 'pechuga', 'arroz', 'ensalada', 'lechuga', 'aguacate', 'verduras'],
+    preparationTip: 'Sazona la pechuga con ajo y limón a la plancha; sirve con arroz blanco y ensalada con aguacate.',
+    bestForGoals: ['lose', 'maintain', 'gain'],
+  },
+  {
+    id: 'local_com_2',
+    mealName: 'Tacos de carne asada con guacamole y nopales',
+    category: 'comida',
+    totalCalories: 610,
+    protein: 42,
+    carbs: 48,
+    fat: 26,
+    ingredients: ['150 g de bistec de res', '3 tortillas de maíz', '1/2 aguacate', '1 taza de nopales asados', 'salsa'],
+    keywords: ['carne', 'bistec', 'res', 'tacos', 'tortilla', 'aguacate', 'nopales'],
+    preparationTip: 'Asa la carne y los nopales al comal; arma los tacos con tortillas calientes y guacamole.',
+    bestForGoals: ['gain', 'maintain'],
+  },
+  {
+    id: 'local_com_3',
+    mealName: 'Bowl de atún con arroz, pepino y aguacate',
+    category: 'comida',
+    totalCalories: 490,
+    protein: 35,
+    carbs: 50,
+    fat: 16,
+    ingredients: ['1 lata de atún en agua', '1 taza de arroz', '1/2 pepino picado', '1/3 de aguacate', 'limón'],
+    keywords: ['atun', 'arroz', 'pepino', 'aguacate', 'limon', 'ensalada'],
+    preparationTip: 'Arma una base de arroz tibio, coloca el atún escurrido encima y añade pepino, aguacate y limón.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_com_4',
+    mealName: 'Pasta integral con pollo en salsa de jitomate',
+    category: 'comida',
+    totalCalories: 640,
+    protein: 45,
+    carbs: 74,
+    fat: 16,
+    ingredients: ['1.5 tazas de pasta cocida', '150 g de pechuga de pollo', 'salsa de jitomate natural', 'brócoli'],
+    keywords: ['pasta', 'pollo', 'pechuga', 'jitomate', 'tomate', 'brocoli'],
+    preparationTip: 'Saltea pollo en cubos y brócoli; mezcla con la pasta cocida y salsa de jitomate sazonada.',
+    bestForGoals: ['gain', 'maintain'],
+  },
+  {
+    id: 'local_com_5',
+    mealName: 'Salmón a la plancha con verduras salteadas y frijoles',
+    category: 'comida',
+    totalCalories: 540,
+    protein: 38,
+    carbs: 34,
+    fat: 26,
+    ingredients: ['150 g de salmón', '1 taza de calabacita y brócoli', '1/2 taza de frijoles cocidos', '1 cdita de aceite'],
+    keywords: ['salmon', 'verduras', 'brocoli', 'calabacita', 'frijol', 'frijoles'],
+    preparationTip: 'Dora el salmón 4 minutos por lado en sartén antiadherente y sirve con verduras salteadas.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_com_6',
+    mealName: 'Guisado casero de lentejas con pollo deshebrado',
+    category: 'comida',
+    totalCalories: 470,
+    protein: 38,
+    carbs: 54,
+    fat: 10,
+    ingredients: ['1.5 tazas de lentejas cocidas', '100 g de pollo deshebrado', 'zanahoria y jitomate'],
+    keywords: ['lentejas', 'pollo', 'zanahoria', 'jitomate', 'verduras'],
+    preparationTip: 'Calienta las lentejas con jitomate y zanahoria picada e integra el pollo deshebrado.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+
+  // CENAS
+  {
+    id: 'local_cen_1',
+    mealName: 'Quesadillas de queso panela con champiñones',
+    category: 'cena',
+    totalCalories: 350,
+    protein: 24,
+    carbs: 34,
+    fat: 13,
+    ingredients: ['2 tortillas de maíz', '80 g de queso panela', '1 taza de champiñones o espinaca', 'salsa'],
+    keywords: ['tortilla', 'queso', 'panela', 'champinones', 'espinaca', 'quesadilla'],
+    preparationTip: 'Saltea los champiñones, rellena las tortillas con queso panela y dóralas al comal sin aceite.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_cen_2',
+    mealName: 'Ensalada tibia de pollo con aguacate y limón',
+    category: 'cena',
+    totalCalories: 370,
+    protein: 36,
+    carbs: 14,
+    fat: 18,
+    ingredients: ['130 g de pechuga de pollo', '2 tazas de lechuga y pepino', '1/3 de aguacate', 'limón y pimienta'],
+    keywords: ['pollo', 'pechuga', 'lechuga', 'pepino', 'aguacate', 'ensalada'],
+    preparationTip: 'Corta el pollo a la plancha en tiras sobre cama de lechuga y pepino, adereza con limón.',
+    bestForGoals: ['lose', 'maintain'],
+  },
+  {
+    id: 'local_cen_3',
+    mealName: 'Sándwich integral de atún o jamón de pavo con aguacate',
+    category: 'cena',
+    totalCalories: 410,
+    protein: 29,
+    carbs: 38,
+    fat: 15,
+    ingredients: ['2 rebanadas de pan integral', '1 lata de atún o 80 g de jamón', '1/3 de aguacate', 'lechuga y jitomate'],
+    keywords: ['pan', 'atun', 'jamon', 'aguacate', 'lechuga', 'jitomate', 'sandwich'],
+    preparationTip: 'Tuesta ligeramente el pan, unta aguacate y rellena con atún escurrido o pavo y vegetales.',
+    bestForGoals: ['maintain', 'gain', 'lose'],
+  },
+  {
+    id: 'local_cen_4',
+    mealName: 'Tostadas horneadas de pollo deshebrado con frijoles',
+    category: 'cena',
+    totalCalories: 430,
+    protein: 34,
+    carbs: 46,
+    fat: 11,
+    ingredients: ['2 tostadas horneadas o tortillas', '120 g de pollo deshebrado', '1/3 taza de frijoles', 'lechuga y queso'],
+    keywords: ['tortilla', 'tostada', 'pollo', 'frijol', 'frijoles', 'lechuga', 'queso'],
+    preparationTip: 'Unta frijoles molidos en las tostadas, agrega pollo deshebrado, lechuga y queso fresco.',
+    bestForGoals: ['maintain', 'gain'],
+  },
+  {
+    id: 'local_cen_5',
+    mealName: 'Licuado nocturno de proteína o leche con avena y nueces',
+    category: 'cena',
+    totalCalories: 460,
+    protein: 32,
+    carbs: 44,
+    fat: 17,
+    ingredients: ['1 taza de leche', '1 scoop de proteína o 1 yogur griego', '1/3 taza de avena', '15 g de nueces'],
+    keywords: ['leche', 'proteina', 'yogur', 'avena', 'nuez', 'nueces', 'licuado'],
+    preparationTip: 'Licúa la leche fría con la proteína (o yogur), avena y nueces durante 30 segundos.',
+    bestForGoals: ['gain', 'maintain'],
+  },
+];
+
+function getGoalFocusText(profile: UserProfile): string {
+  if (profile.goal === 'lose') {
+    return 'prioriza proteína alta y saciedad con calorías controladas';
+  }
+  if (profile.goal === 'gain') {
+    return 'aporta buena energía y proteína para apoyar masa muscular';
+  }
+  return 'mantiene un balance práctico entre proteínas, carbohidratos y grasas';
+}
+
+function getTargetBudgetCalories(req: MealSuggestionRequest): {
+  budget: number;
+  alreadyAtTarget: boolean;
+} {
+  if (req.remainingCalories <= 120) {
+    return {
+      budget: req.targetCategory === 'comida' ? 380 : 300,
+      alreadyAtTarget: true,
+    };
+  }
+  if (req.remainingCalories <= 820) {
+    return { budget: Math.max(240, req.remainingCalories), alreadyAtTarget: false };
+  }
+  const share = MEAL_CATEGORY_META[req.targetCategory].share;
+  const proportional = Math.round(req.remainingCalories * Math.min(0.6, share + 0.15));
+  return {
+    budget: Math.max(320, Math.min(820, proportional)),
+    alreadyAtTarget: false,
+  };
+}
+
+function scaleLocalTemplate(
+  tpl: LocalMealTemplate,
+  targetBudget: number,
+  fitReason: string,
+  matchedIngredients?: string[],
+  extraIngredients?: string[]
+): SuggestedMeal {
+  const rawRatio = targetBudget / Math.max(1, tpl.totalCalories);
+  const ratio = Math.max(0.75, Math.min(1.35, rawRatio));
+  const scaledCalories = Math.round(tpl.totalCalories * ratio);
+  return {
+    id: `${tpl.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    mealName: tpl.mealName,
+    category: tpl.category,
+    totalCalories: scaledCalories,
+    protein: Math.round(tpl.protein * ratio),
+    carbs: Math.round(tpl.carbs * ratio),
+    fat: Math.round(tpl.fat * ratio),
+    ingredients:
+      Math.abs(ratio - 1) >= 0.18
+        ? [...tpl.ingredients, ratio > 1 ? 'Porción ligeramente ampliada' : 'Porción moderada']
+        : [...tpl.ingredients],
+    matchedIngredients,
+    extraIngredients,
+    preparationTip: tpl.preparationTip,
+    fitReason,
+    isDemo: true,
+  };
+}
+
+function buildDynamicPantryMeal(
+  userIngredients: string[],
+  category: MealCategory,
+  index: number,
+  targetCalories?: number
+): SuggestedMeal {
+  const picked = userIngredients.slice(0, 4);
+  const estimatedItems = picked.map((ing) => estimateSingleIngredientLocally(ing));
+  const totals = recalculateTotalsFromItems(estimatedItems);
+
+  const prepStyle =
+    category === 'desayuno'
+      ? { title: 'Desayuno rápido', tip: `Combina ${picked.join(', ')} en sartén o plato fresco en menos de 10 minutos.` }
+      : category === 'comida'
+        ? { title: 'Plato práctico', tip: `Cocina a la plancha o saltea ${picked.join(', ')} con especias al gusto.` }
+        : { title: 'Cena ligera', tip: `Prepara una versión ligera al comal o ensalada tibia con ${picked.join(', ')}.` };
+
+  const baseCal = Math.max(180, totals.totalCalories);
+  const ratio =
+    targetCalories && targetCalories >= 180
+      ? Math.max(0.75, Math.min(1.35, targetCalories / baseCal))
+      : 1;
+
+  const extra = index === 0 ? ['Sal, pimienta o limón'] : ['Aceite en aerosol o especias'];
+
+  return {
+    id: `dyn_pantry_${index}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    mealName: `${prepStyle.title} con ${picked.slice(0, 2).join(' y ')}`,
+    category,
+    totalCalories: Math.round(baseCal * ratio),
+    protein: Math.round(totals.protein * ratio),
+    carbs: Math.round(totals.carbs * ratio),
+    fat: Math.round(totals.fat * ratio),
+    ingredients: estimatedItems.map((it) => `${it.name} (${it.portion})`),
+    matchedIngredients: picked,
+    extraIngredients: extra,
+    preparationTip: prepStyle.tip,
+    fitReason: `Aprovecha directamente tus ingredientes (${picked.join(', ')}) con macros calculados.`,
+    isDemo: true,
+  };
+}
+
+export function suggestMealsLocally(req: MealSuggestionRequest): SuggestedMeal[] {
+  const seed = req.variationSeed ?? 0;
+
+  if (req.mode === 'goal') {
+    const { budget, alreadyAtTarget } = getTargetBudgetCalories(req);
+    const goalLabel = GOAL_LABELS[req.profile.goal].label.toLowerCase();
+    const goalFocus = getGoalFocusText(req.profile);
+
+    const pool = LOCAL_SUGGESTED_MEALS.filter(
+      (tpl) => tpl.category === req.targetCategory
+    ).sort((a, b) => {
+      const aGoalScore = a.bestForGoals.includes(req.profile.goal) ? 0 : 1;
+      const bGoalScore = b.bestForGoals.includes(req.profile.goal) ? 0 : 1;
+      if (aGoalScore !== bGoalScore) return aGoalScore - bGoalScore;
+      return Math.abs(a.totalCalories - budget) - Math.abs(b.totalCalories - budget);
+    });
+
+    const rotated =
+      pool.length > 0
+        ? pool.map((_, idx) => pool[(idx + (seed % pool.length)) % pool.length])
+        : [];
+
+    return rotated.slice(0, 3).map((tpl, idx) => {
+      const offsetBudget = Math.max(220, budget + (idx === 1 ? -45 : idx === 2 ? 45 : 0));
+      const fitReason = alreadyAtTarget
+        ? `Opción ligera pensada para ${goalLabel}: ya cubriste tu meta diaria y ${goalFocus}.`
+        : `Encaja con tu objetivo de ${goalLabel} (${goalFocus}) dentro de tus ${req.remainingCalories} kcal restantes.`;
+      return scaleLocalTemplate(tpl, offsetBudget, fitReason);
+    });
+  }
+
+  // Modo "Con lo que tengo"
+  const userIngredients = (req.pantryIngredients ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const categoryFilter = req.pantryCategoryFilter ?? 'any';
+  const defaultCategory: MealCategory =
+    categoryFilter === 'any' ? req.targetCategory : categoryFilter;
+
+  const candidates = LOCAL_SUGGESTED_MEALS.filter(
+    (tpl) => categoryFilter === 'any' || tpl.category === categoryFilter
+  );
+
+  const scored = candidates.map((tpl) => {
+    const matched = userIngredients.filter((userIng) => {
+      const normUser = normalizeSpanishText(userIng);
+      return (
+        tpl.keywords.some((kw) => {
+          const normKw = normalizeSpanishText(kw);
+          return normUser.includes(normKw) || normKw.includes(normUser);
+        }) ||
+        tpl.ingredients.some((ing) => normalizeSpanishText(ing).includes(normUser))
+      );
+    });
+
+    const extras = tpl.ingredients.filter((recipeIng) => {
+      const normRecipe = normalizeSpanishText(recipeIng);
+      return !userIngredients.some((u) => {
+        const normU = normalizeSpanishText(u);
+        return normRecipe.includes(normU) || normU.split(/\s+/).some((w) => w.length > 2 && normRecipe.includes(w));
+      });
+    });
+
+    return { tpl, matched, extras };
+  });
+
+  scored.sort((a, b) => {
+    if (b.matched.length !== a.matched.length) {
+      return b.matched.length - a.matched.length;
+    }
+    return a.extras.length - b.extras.length;
+  });
+
+  const matchingRecipes = scored.filter((item) => item.matched.length > 0);
+  const results: SuggestedMeal[] = [];
+  const budgetInfo = req.adjustToRemainingCalories
+    ? getTargetBudgetCalories({ ...req, targetCategory: defaultCategory })
+    : null;
+
+  const offsetStart =
+    matchingRecipes.length > 3 ? seed % matchingRecipes.length : 0;
+
+  for (let i = 0; i < matchingRecipes.length && results.length < 3; i++) {
+    const pick = matchingRecipes[(i + offsetStart) % matchingRecipes.length];
+    const targetKcal = budgetInfo ? budgetInfo.budget : pick.tpl.totalCalories;
+    const reason =
+      pick.extras.length === 0
+        ? `Usa ${pick.matched.join(', ')} sin requerir ingredientes extra.`
+        : `Aprovecha ${pick.matched.join(', ')} y solo requiere básicos como ${pick.extras.slice(0, 2).join(', ')}.`;
+    results.push(
+      scaleLocalTemplate(pick.tpl, targetKcal, reason, pick.matched, pick.extras)
+    );
+  }
+
+  // Si faltan sugerencias hasta 3, generar combinaciones dinámicas con los ingredientes del usuario
+  if (results.length < 3 && userIngredients.length > 0) {
+    const fallbackCategories: MealCategory[] =
+      categoryFilter === 'any'
+        ? [defaultCategory, 'comida', 'cena']
+        : [categoryFilter, categoryFilter, categoryFilter];
+
+    let dynIdx = 0;
+    while (results.length < 3) {
+      const rotatedIngs = userIngredients.map(
+        (_, i) => userIngredients[(i + dynIdx + seed) % userIngredients.length]
+      );
+      results.push(
+        buildDynamicPantryMeal(
+          rotatedIngs,
+          fallbackCategories[results.length % fallbackCategories.length],
+          dynIdx,
+          budgetInfo ? budgetInfo.budget : undefined
+        )
+      );
+      dynIdx += 1;
+    }
+  }
+
+  // Si el usuario no escribió ningún ingrediente aún, devolver 3 opciones prácticas del filtro
+  if (results.length === 0) {
+    return scored.slice(0, 3).map((item) =>
+      scaleLocalTemplate(
+        item.tpl,
+        budgetInfo ? budgetInfo.budget : item.tpl.totalCalories,
+        'Sugerencia equilibrada y rápida con ingredientes básicos de despensa.',
+        [],
+        item.tpl.ingredients
+      )
+    );
+  }
+
+  return results;
+}
+
+function buildSuggestionPrompt(req: MealSuggestionRequest): string {
+  const goalInfo = GOAL_LABELS[req.profile.goal];
+  const categoryLabel = MEAL_CATEGORY_META[req.targetCategory].label;
+  const remainingInfo = `Calorías restantes del día: ${Math.max(0, req.remainingCalories)} kcal (Macros restantes: ${Math.max(0, req.remainingMacros.protein)}g proteína, ${Math.max(0, req.remainingMacros.carbs)}g carbohidratos, ${Math.max(0, req.remainingMacros.fat)}g grasas).`;
+
+  if (req.mode === 'goal') {
+    return [
+      `Eres un nutriólogo práctico especializado en cocina mexicana y latinoamericana cotidiana.`,
+      `Objetivo del usuario: ${goalInfo.label} (${goalInfo.badge}).`,
+      remainingInfo,
+      `Tiempo de comida solicitado: ${categoryLabel} (category="${req.targetCategory}").`,
+      req.remainingCalories <= 120
+        ? `El usuario ya alcanzó su meta del día; sugiere 3 opciones muy ligeras y saludables de 220 a 380 kcal.`
+        : `Sugiere exactamente 3 platillos distintos para ${categoryLabel} que encajen con el presupuesto restante sin pasarse de la meta.`,
+      `Devuelve solo JSON válido en español siguiendo el esquema solicitado.`,
+    ].join('\n');
+  }
+
+  const ingredientsText = (req.pantryIngredients ?? []).join(', ');
+  const filterText =
+    req.pantryCategoryFilter && req.pantryCategoryFilter !== 'any'
+      ? `Tiempo de comida obligatorio: ${MEAL_CATEGORY_META[req.pantryCategoryFilter].label} (category="${req.pantryCategoryFilter}").`
+      : `Tiempo de comida: cualquiera apropiado para cada receta (desayuno, comida o cena).`;
+
+  return [
+    `Eres un chef nutriólogo práctico.`,
+    `El usuario tiene disponibles estos ingredientes: ${ingredientsText || 'despensa básica casera'}.`,
+    `Objetivo del perfil: ${goalInfo.label}.`,
+    filterText,
+    req.adjustToRemainingCalories
+      ? `IMPORTANTE: Ajusta las porciones a su presupuesto restante (${remainingInfo}).`
+      : `Contexto calórico: ${remainingInfo}`,
+    `Genera exactamente 3 platillos realistas priorizando los ingredientes ingresados. Indica en matchedIngredients cuáles ingredientes del usuario usa y en extraIngredients solo básicos extras si hicieran falta.`,
+    `Devuelve solo JSON válido en español siguiendo el esquema solicitado.`,
+  ].join('\n');
+}
+
+function isValidCategory(value: unknown): value is MealCategory {
+  return value === 'desayuno' || value === 'comida' || value === 'cena';
+}
+
+/**
+ * Genera 3 recomendaciones de platillos usando Gemini (`gemini-4-hydrogen`, `v1beta`)
+ * o mediante el catálogo/motor nutricional local si no hay API Key o falla la red.
+ */
+export async function generateMealSuggestions(
+  req: MealSuggestionRequest
+): Promise<SuggestedMeal[]> {
+  const apiKey = loadGeminiApiKey();
+
+  if (!apiKey) {
+    await new Promise((r) => setTimeout(r, 600));
+    return suggestMealsLocally(req);
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
+    const interaction = await ai.interactions.create({
+      api_version: 'v1beta',
+      model: 'gemini-4-hydrogen',
+      input: buildSuggestionPrompt(req),
+      response_format: {
+        type: 'text',
+        mime_type: 'application/json',
+        schema: mealSuggestionsJsonSchema,
+      },
+    });
+
+    const rawText = interaction.output_text;
+    if (!rawText) {
+      return suggestMealsLocally(req);
+    }
+
+    const parsed = JSON.parse(rawText) as {
+      suggestions?: Array<Partial<SuggestedMeal>>;
+    };
+    const list = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    if (list.length === 0) {
+      return suggestMealsLocally(req);
+    }
+
+    const fallbackCat: MealCategory =
+      req.mode === 'pantry' &&
+      req.pantryCategoryFilter &&
+      req.pantryCategoryFilter !== 'any'
+        ? req.pantryCategoryFilter
+        : req.targetCategory;
+
+    return list.slice(0, 3).map((item, idx) => ({
+      id: `ai_sug_${idx}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      mealName: String(item.mealName || 'Platillo recomendado'),
+      category: isValidCategory(item.category) ? item.category : fallbackCat,
+      totalCalories: Math.max(50, Math.round(Number(item.totalCalories) || 350)),
+      protein: Math.max(0, Math.round(Number(item.protein) || 0)),
+      carbs: Math.max(0, Math.round(Number(item.carbs) || 0)),
+      fat: Math.max(0, Math.round(Number(item.fat) || 0)),
+      ingredients: Array.isArray(item.ingredients)
+        ? item.ingredients.map(String).filter(Boolean)
+        : [],
+      matchedIngredients: Array.isArray(item.matchedIngredients)
+        ? item.matchedIngredients.map(String).filter(Boolean)
+        : undefined,
+      extraIngredients: Array.isArray(item.extraIngredients)
+        ? item.extraIngredients.map(String).filter(Boolean)
+        : undefined,
+      preparationTip: String(
+        item.preparationTip || 'Prepara con poco aceite y ajusta porciones a tu gusto.'
+      ),
+      fitReason: String(
+        item.fitReason || 'Equilibrado para tu meta diaria de calorías y macros.'
+      ),
+      isDemo: false,
+    }));
+  } catch (err) {
+    console.warn('Error generando sugerencias con Gemini, usando respaldo local:', err);
+    return suggestMealsLocally(req);
+  }
 }
