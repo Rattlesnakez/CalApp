@@ -97,3 +97,12 @@ export interface MealSuggestionRequest {
   adjustToRemainingCalories?: boolean;
   variationSeed?: number;
 }
+
+export type ThemeMode = 'light' | 'dark';
+
+export interface PhotoPreviewData {
+  src: string;
+  mealName: string;
+  category: MealCategory;
+  totalCalories: number;
+}

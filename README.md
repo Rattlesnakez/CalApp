@@ -15,6 +15,7 @@ Aplicación web progresiva (**PWA**) optimizada para teléfono móvil en españo
 - **Cálculo personal de calorías y macros:** Calcula tu tasa metabólica basal (Mifflin-St Jeor), gasto diario (TDEE), IMC, meta calórica según objetivo (*Perder grasa*, *Mantener peso* o *Ganar músculo*) y macros recomendados.
 - **Desayuno, Comida y Cena editables con ajuste rápido de porciones:** Organización diaria por tiempo de comida con desglose frente a la meta sugerida, controles `-`/`+` y edición directa de porción por ingrediente con recálculo automático de calorías y macros, edición completa de platillos guardados y confirmación visual antes de eliminar.
 - **Veredicto diario e historial:** Indica automáticamente si **Cumplió** (`90%–105%`), **No cumplió** (`< 90%`) o **Excedió** (`> 105%`) tus calorías requeridas y guarda el historial de los últimos 7 días en el dispositivo (`localStorage`).
+- **Modo Oscuro y vista previa de fotos:** Alterna entre tema **Claro** y **Oscuro** (con detección automática del sistema y persistencia en `localStorage`) desde **Hoy** o **Mi Perfil**, y toca cualquier miniatura de foto para verla en pantalla completa.
 
 ---
 

@@ -77,25 +77,25 @@ export const MEAL_CATEGORY_META: Record<
     label: 'Desayuno',
     share: 0.3,
     timeHint: 'Mañana • ~30% del día',
-    accentBg: 'bg-amber-50',
-    accentText: 'text-amber-700',
-    accentBorder: 'border-amber-200',
+    accentBg: 'bg-amber-50 dark:bg-amber-950/40',
+    accentText: 'text-amber-700 dark:text-amber-400',
+    accentBorder: 'border-amber-200 dark:border-amber-800/60',
   },
   comida: {
     label: 'Comida',
     share: 0.4,
     timeHint: 'Mediodía • ~40% del día',
-    accentBg: 'bg-emerald-50',
-    accentText: 'text-emerald-700',
-    accentBorder: 'border-emerald-200',
+    accentBg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    accentText: 'text-emerald-700 dark:text-emerald-400',
+    accentBorder: 'border-emerald-200 dark:border-emerald-800/60',
   },
   cena: {
     label: 'Cena',
     share: 0.3,
     timeHint: 'Noche • ~30% del día',
-    accentBg: 'bg-indigo-50',
-    accentText: 'text-indigo-700',
-    accentBorder: 'border-indigo-200',
+    accentBg: 'bg-indigo-50 dark:bg-indigo-950/40',
+    accentText: 'text-indigo-700 dark:text-indigo-400',
+    accentBorder: 'border-indigo-200 dark:border-indigo-800/60',
   },
 };
 
@@ -169,23 +169,39 @@ export function calculateBMI(
 ): { value: number; category: string; colorClass: string } {
   const heightM = heightCm / 100;
   if (heightM <= 0) {
-    return { value: 0, category: 'Sin datos', colorClass: 'text-slate-500' };
+    return {
+      value: 0,
+      category: 'Sin datos',
+      colorClass: 'text-slate-500 dark:text-slate-400',
+    };
   }
   const bmi = Number((weightKg / (heightM * heightM)).toFixed(1));
   if (bmi < 18.5) {
-    return { value: bmi, category: 'Bajo peso', colorClass: 'text-sky-600' };
+    return {
+      value: bmi,
+      category: 'Bajo peso',
+      colorClass: 'text-sky-600 dark:text-sky-400',
+    };
   }
   if (bmi < 25) {
     return {
       value: bmi,
       category: 'Peso saludable',
-      colorClass: 'text-emerald-600',
+      colorClass: 'text-emerald-600 dark:text-emerald-400',
     };
   }
   if (bmi < 30) {
-    return { value: bmi, category: 'Sobrepeso', colorClass: 'text-amber-600' };
+    return {
+      value: bmi,
+      category: 'Sobrepeso',
+      colorClass: 'text-amber-600 dark:text-amber-400',
+    };
   }
-  return { value: bmi, category: 'Obesidad', colorClass: 'text-rose-600' };
+  return {
+    value: bmi,
+    category: 'Obesidad',
+    colorClass: 'text-rose-600 dark:text-rose-400',
+  };
 }
 
 /**

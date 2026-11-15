@@ -21,6 +21,7 @@ import type {
   MealAnalysisResult,
   MealCategory,
   MealEntry,
+  PhotoPreviewData,
 } from '../types';
 import {
   type ItemPortionBase,
@@ -48,6 +49,7 @@ interface PhotoScannerModalProps {
   onSaveMeal: (entry: MealEntry) => void;
   editingEntry?: MealEntry | null;
   onUpdateMeal?: (entry: MealEntry) => void;
+  onPreviewPhoto?: (data: PhotoPreviewData) => void;
 }
 
 type ModalStep = 'choose' | 'camera' | 'manual_input' | 'analyzing' | 'review';
@@ -76,6 +78,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   onSaveMeal,
   editingEntry = null,
   onUpdateMeal,
+  onPreviewPhoto,
 }) => {
   const [category, setCategory] = useState<MealCategory>(initialCategory);
   const [step, setStep] = useState<ModalStep>('choose');
@@ -741,24 +744,24 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md max-h-[86dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col">
+      <div className="w-full max-w-md max-h-[86dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-transparent dark:border-slate-800 shadow-2xl flex flex-col">
         {/* Cabecera Modal */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 backdrop-blur px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-5 py-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
                 {isEditing
                   ? 'Editar Comida Registrada'
                   : 'Escáner de Calorías IA'}
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {isEditing
                   ? 'Modifica platillo, comida, porciones o macros'
                   : hasApiKey
@@ -770,7 +773,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           <button
             type="button"
             onClick={handleCloseModal}
-            className="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="p-2 rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition"
             aria-label="Cerrar escáner"
           >
             <X className="w-5 h-5" />
@@ -780,7 +783,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         <div className="p-5 pb-safe space-y-4">
           {/* Selector de Tiempo de Comida */}
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
               ¿Qué comida vas a registrar?
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -795,7 +798,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     className={`rounded-2xl py-2.5 text-xs font-bold border transition ${
                       active
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
                     {MEAL_CATEGORY_META[cat].label}
@@ -806,13 +809,13 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-700 space-y-2">
+            <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 p-3 text-xs font-semibold text-rose-700 dark:text-rose-300 space-y-2">
               <p>{errorMsg}</p>
               {showNativeFallback && (
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-rose-200 px-3 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100/60"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800 px-3 py-1.5 text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100/60 dark:hover:bg-rose-950"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   Abrir cámara del teléfono (respaldo)
@@ -863,7 +866,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-2 rounded-3xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white p-5 shadow-lg shadow-slate-900/15 transition"
+                  className="flex flex-col items-center justify-center gap-2 rounded-3xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 active:scale-[0.98] text-white p-5 shadow-lg shadow-slate-900/15 border border-transparent dark:border-slate-700 transition"
                 >
                   <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
                     <ImagePlus className="w-6 h-6" />
@@ -878,7 +881,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               </div>
 
               {!hasApiKey && (
-                <div className="rounded-2xl bg-amber-50/90 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-900 space-y-2">
+                <div className="rounded-2xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3.5 py-2.5 text-xs text-amber-900 dark:text-amber-200 space-y-2">
                   <p>
                     <strong>Modo Demo activo:</strong> conecta tu API Key en{' '}
                     <strong>Mi Perfil</strong> para análisis real con Gemini.
@@ -887,7 +890,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowDemoTutorial((v) => !v)}
-                      className="inline-flex items-center gap-1 font-bold text-emerald-800 underline hover:text-emerald-900"
+                      className="inline-flex items-center gap-1 font-bold text-emerald-800 dark:text-emerald-400 underline hover:text-emerald-900 dark:hover:text-emerald-300"
                     >
                       <HelpCircle className="w-3.5 h-3.5 shrink-0" />
                       {showDemoTutorial
@@ -899,7 +902,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                       onClick={() =>
                         handleRunDemoTemplate(DEMO_MEAL_TEMPLATES[0].id)
                       }
-                      className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-950"
+                      className="inline-flex items-center gap-1 font-bold text-amber-900 dark:text-amber-300 underline hover:text-amber-950 dark:hover:text-amber-200"
                     >
                       <Sparkles className="w-3.5 h-3.5 shrink-0" />
                       Probar 1 ejemplo rápido
@@ -912,9 +915,9 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               <button
                 type="button"
                 onClick={handleStartManualEntry}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-3.5 text-xs font-bold text-slate-700 flex items-center justify-center gap-2 transition"
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 py-3.5 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 transition"
               >
-                <Edit3 className="w-4 h-4 text-slate-500" />
+                <Edit3 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                 Escribir comida manualmente (cálculo automático)
               </button>
             </div>
@@ -931,7 +934,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     setErrorMsg('');
                     setStep('choose');
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Volver
@@ -939,7 +942,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 <button
                   type="button"
                   onClick={handleToggleCameraFacing}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700 transition"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Cambiar cámara
@@ -997,18 +1000,18 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     setErrorMsg('');
                     setStep('choose');
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Volver a cámara
                 </button>
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 rounded-full px-2.5 py-0.5">
                   Detección automática
                 </span>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
                   Describe lo que comiste en{' '}
                   {MEAL_CATEGORY_META[category].label.toLowerCase()}
                 </label>
@@ -1017,9 +1020,9 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   value={manualText}
                   onChange={(e) => setManualText(e.target.value)}
                   placeholder="Ej. 2 huevos revueltos con jamón, 2 tortillas de maíz y 1 taza de café con leche"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3.5 text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
                 />
-                <p className="mt-1.5 text-[11px] text-slate-500">
+                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                   {hasApiKey
                     ? 'Gemini IA desglosará cada alimento y calculará sus calorías y macros automáticamente.'
                     : 'Calcularemos automáticamente calorías y macros según cantidades y porciones (o conecta tu API Key para análisis IA completo).'}
@@ -1027,7 +1030,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               </div>
 
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                   Ejemplos rápidos (toca para llenar)
                 </p>
                 <div className="space-y-1.5">
@@ -1036,7 +1039,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                       key={example}
                       type="button"
                       onClick={() => setManualText(example)}
-                      className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 px-3 py-2 text-xs text-slate-700 transition"
+                      className="w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 transition"
                     >
                       “{example}”
                     </button>
@@ -1058,7 +1061,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           {step === 'analyzing' && (
             <div className="py-4 space-y-4 text-center">
               {photoPreview ? (
-                <div className="relative mx-auto w-full h-56 rounded-3xl overflow-hidden bg-slate-900 border border-slate-200">
+                <div className="relative mx-auto w-full h-56 rounded-3xl overflow-hidden bg-slate-900 border border-slate-200 dark:border-slate-700">
                   <img
                     src={photoPreview}
                     alt="Analizando comida"
@@ -1067,16 +1070,16 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_18px_4px_rgba(16,185,129,0.9)] animate-scan-beam" />
                 </div>
               ) : (
-                <div className="mx-auto w-20 h-20 rounded-3xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                <div className="mx-auto w-20 h-20 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <Sparkles className="w-9 h-9 animate-pulse" />
                 </div>
               )}
               <div className="flex flex-col items-center gap-2">
-                <Loader2 className="w-7 h-7 text-emerald-600 animate-spin" />
-                <p className="text-sm font-extrabold text-slate-900">
+                <Loader2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400 animate-spin" />
+                <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
                   {analyzingLabel}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Calculando porciones, calorías y macronutrientes
                 </p>
               </div>
@@ -1087,24 +1090,39 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           {step === 'review' && analysis && (
             <div className="space-y-4">
               {photoPreview && (
-                <div className="relative h-40 w-full rounded-2xl overflow-hidden border border-slate-200">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreviewPhoto?.({
+                      src: photoPreview,
+                      mealName:
+                        analysis.mealName.trim() ||
+                        MEAL_CATEGORY_META[category].label,
+                      category,
+                      totalCalories: analysis.totalCalories,
+                    });
+                  }}
+                  aria-label="Ver foto en pantalla completa"
+                  className="relative block h-40 w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 group focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
                   <img
                     src={photoPreview}
                     alt={analysis.mealName}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
                   />
                   {analysis.isDemo && (
                     <span className="absolute top-2.5 left-2.5 rounded-full bg-slate-900/80 text-white px-2.5 py-0.5 text-[10px] font-bold">
                       Análisis Demo Editable
                     </span>
                   )}
-                </div>
+                </button>
               )}
 
               {/* Nombre del platillo + resumen */}
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-2.5">
+              <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 p-3.5 space-y-2.5">
                 <div>
-                  <label className="block text-[11px] font-bold text-emerald-800 uppercase mb-1">
+                  <label className="block text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
                     Nombre del platillo
                   </label>
                   <input
@@ -1112,14 +1130,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     value={analysis.mealName}
                     onChange={(e) => handleUpdateMealName(e.target.value)}
                     placeholder="Ej. Chilaquiles verdes con pollo"
-                    className="w-full rounded-xl bg-white border border-emerald-200 px-3 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                    className="w-full rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-600 focus:outline-none"
                   />
                 </div>
 
                 {analysis.items.length === 0 ? (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-emerald-800 font-semibold">
+                      <span className="text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
                         Totales del platillo (sin desglose)
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -1134,14 +1152,16 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                           }
                           placeholder="0"
                           aria-label="Calorías totales"
-                          className="w-24 rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5 text-base font-black text-right text-emerald-950 focus:border-emerald-600 focus:outline-none"
+                          className="w-24 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-base font-black text-right text-emerald-950 dark:text-emerald-200 focus:border-emerald-600 focus:outline-none"
                         />
-                        <span className="text-xs font-bold text-emerald-900">kcal</span>
+                        <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                          kcal
+                        </span>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                           Proteína (g)
                         </span>
                         <input
@@ -1154,11 +1174,11 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                             handleUpdateDirectTotal('protein', e.target.value)
                           }
                           placeholder="0"
-                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                          className="w-full text-xs font-extrabold text-slate-900 dark:text-slate-100 bg-transparent focus:outline-none"
                         />
                       </label>
-                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                           Carbos (g)
                         </span>
                         <input
@@ -1171,11 +1191,11 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                             handleUpdateDirectTotal('carbs', e.target.value)
                           }
                           placeholder="0"
-                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                          className="w-full text-xs font-extrabold text-slate-900 dark:text-slate-100 bg-transparent focus:outline-none"
                         />
                       </label>
-                      <label className="rounded-xl bg-white border border-emerald-200 px-2.5 py-1.5 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                      <label className="rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                           Grasas (g)
                         </span>
                         <input
@@ -1188,7 +1208,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                             handleUpdateDirectTotal('fat', e.target.value)
                           }
                           placeholder="0"
-                          className="w-full text-xs font-extrabold text-slate-900 bg-transparent focus:outline-none"
+                          className="w-full text-xs font-extrabold text-slate-900 dark:text-slate-100 bg-transparent focus:outline-none"
                         />
                       </label>
                     </div>
@@ -1196,14 +1216,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 ) : (
                   <div className="flex items-center justify-between pt-0.5">
                     <div>
-                      <span className="text-xs text-emerald-800 font-semibold">
+                      <span className="text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
                         {isEditing ? 'Total del platillo' : 'Total detectado'}
                       </span>
-                      <p className="text-2xl font-black text-emerald-950">
+                      <p className="text-2xl font-black text-emerald-950 dark:text-emerald-200">
                         {analysis.totalCalories} kcal
                       </p>
                     </div>
-                    <div className="text-right text-xs font-semibold text-emerald-900 space-y-0.5">
+                    <div className="text-right text-xs font-semibold text-emerald-900 dark:text-emerald-300 space-y-0.5">
                       <p>Proteína: {analysis.protein} g</p>
                       <p>Carbos: {analysis.carbs} g</p>
                       <p>Grasas: {analysis.fat} g</p>
@@ -1213,21 +1233,24 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               </div>
 
               {analysis.aiTip && (
-                <p className="rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-600 leading-relaxed">
-                  <strong>Consejo IA:</strong> {analysis.aiTip}
+                <p className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <strong className="text-slate-800 dark:text-slate-100">
+                    Consejo IA:
+                  </strong>{' '}
+                  {analysis.aiTip}
                 </p>
               )}
 
               {/* Lista de ingredientes editables */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     {isEditing ? 'Ingredientes / alimentos' : 'Alimentos detectados'} ({analysis.items.length})
                   </p>
                   <button
                     type="button"
                     onClick={() => setShowAddItemForm((v) => !v)}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Añadir ingrediente
@@ -1235,14 +1258,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 </div>
 
                 {showAddItemForm && (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3 space-y-2">
+                  <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/30 p-3 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
                         placeholder="Alimento (ej. Manzana)"
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold"
+                        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
                       />
                       <input
                         type="number"
@@ -1252,7 +1275,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         placeholder="Kcal (opcional: auto)"
                         value={newItemCalories}
                         onChange={(e) => setNewItemCalories(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold"
+                        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -1261,7 +1284,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         placeholder="Porción (ej. 1 pieza o 150g)"
                         value={newItemPortion}
                         onChange={(e) => setNewItemPortion(e.target.value)}
-                        className="flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs"
+                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
                       />
                       <button
                         type="button"
@@ -1277,14 +1300,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         {newItemCalories.trim() ? 'Añadir' : 'Auto kcal'}
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Si dejas calorías vacío, las calculamos automáticamente según el alimento y porción.
                     </p>
                   </div>
                 )}
 
                 {analysis.items.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-200 px-3.5 py-3 text-xs text-slate-500 text-center">
+                  <p className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-3.5 py-3 text-xs text-slate-500 dark:text-slate-400 text-center">
                     No hay ingredientes individuales. Puedes editar los totales arriba o añadir un ingrediente.
                   </p>
                 ) : (
@@ -1298,7 +1321,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     return (
                       <div
                         key={`item_${idx}`}
-                        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5"
+                        className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-3 space-y-2.5"
                       >
                         {/* Fila 1: Nombre del alimento + calorías resultantes + eliminar */}
                         <div className="flex items-center gap-2">
@@ -1309,7 +1332,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                               handleUpdateItemName(idx, e.target.value)
                             }
                             placeholder="Nombre del alimento"
-                            className="flex-1 min-w-0 text-xs font-extrabold text-slate-900 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
+                            className="flex-1 min-w-0 text-xs font-extrabold text-slate-900 dark:text-slate-100 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
                           />
                           <div className="flex items-center gap-1.5 shrink-0">
                             <input
@@ -1323,15 +1346,15 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                 handleUpdateItemCalories(idx, e.target.value)
                               }
                               aria-label={`Calorías de ${item.name || 'ingrediente'}`}
-                              className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-extrabold text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
+                              className="w-16 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-xs font-extrabold text-right text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
                             />
-                            <span className="text-[11px] font-semibold text-slate-500">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                               kcal
                             </span>
                             <button
                               type="button"
                               onClick={() => handleDeleteItem(idx)}
-                              className="p-1 text-slate-400 hover:text-rose-600"
+                              className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
                               aria-label="Quitar alimento"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1341,7 +1364,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
                         {/* Fila 2: Control táctil de porción (- [cantidad unidad] +) */}
                         {isEditingUnit ? (
-                          <div className="rounded-xl bg-slate-50 border border-slate-200 p-2 space-y-1.5">
+                          <div className="rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-2 space-y-1.5">
                             <div className="flex items-center gap-1.5">
                               <input
                                 type="text"
@@ -1357,7 +1380,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                 }}
                                 placeholder="Ej. 120 g, 1.5 tazas, 2 piezas"
                                 autoFocus
-                                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                className="flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
                               />
                               <button
                                 type="button"
@@ -1376,26 +1399,26 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                 type="button"
                                 onClick={handleCancelPortionTextEdit}
                                 aria-label="Cancelar cambio de porción"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+                                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                            <p className="text-[10px] text-slate-500">
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">
                               Cambia la unidad (ej. &quot;1 pieza&quot; a &quot;120 g&quot;) para recalcular calorías automáticamente.
                             </p>
                           </div>
                         ) : (
                           <div className="space-y-1.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-50 border border-slate-200 p-1">
+                              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-1">
                                 <button
                                   type="button"
                                   onClick={() =>
                                     handleStepItemQuantity(idx, -base.parsedPortion.step)
                                   }
                                   aria-label={`Disminuir cantidad de ${item.name || 'ingrediente'}`}
-                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-center transition"
+                                  className="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center justify-center transition"
                                 >
                                   <Minus className="w-3.5 h-3.5" />
                                 </button>
@@ -1409,16 +1432,16 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                     handleUpdateItemQuantityInput(idx, e.target.value)
                                   }
                                   aria-label={`Cantidad de ${item.name || 'ingrediente'}`}
-                                  className="w-12 rounded-lg bg-white border border-slate-200 px-1 py-1 text-xs font-extrabold text-center text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                  className="w-12 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1 py-1 text-xs font-extrabold text-center text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => handleStartEditPortionText(idx)}
                                   title="Toca para cambiar unidad o texto de porción"
-                                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-white hover:text-emerald-700 transition max-w-[8.5rem] truncate"
+                                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 hover:text-emerald-700 dark:hover:text-emerald-300 transition max-w-[8.5rem] truncate"
                                 >
                                   <span className="truncate">{currentParsed.unit}</span>
-                                  <Edit3 className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                  <Edit3 className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                 </button>
                                 <button
                                   type="button"
@@ -1426,14 +1449,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                     handleStepItemQuantity(idx, base.parsedPortion.step)
                                   }
                                   aria-label={`Aumentar cantidad de ${item.name || 'ingrediente'}`}
-                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-center transition"
+                                  className="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center justify-center transition"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
                                 </button>
                               </div>
 
                               {currentParsed.gramsInParens && (
-                                <span className="text-[11px] font-medium text-slate-400">
+                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
                                   ~{Math.round(currentParsed.gramsInParens)}{' '}
                                   {currentParsed.gramsInParensUnit || 'g'}
                                 </span>
@@ -1443,8 +1466,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         )}
 
                         {/* Fila 3: Resumen limpio + desplegable de macros manuales */}
-                        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
-                          <span className="text-[11px] font-medium text-slate-500">
+                        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/70">
+                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             P: {item.protein}g • C: {item.carbs}g • G: {item.fat}g
                           </span>
                           <button
@@ -1455,7 +1478,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                 [idx]: !prev[idx],
                               }))
                             }
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 shrink-0"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 shrink-0"
                           >
                             <span>
                               {isMacrosOpen
@@ -1472,8 +1495,10 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
                         {isMacrosOpen && (
                           <div className="grid grid-cols-3 gap-2 pt-1">
-                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                              <span className="font-bold text-slate-500">P</span>
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/70 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500 dark:text-slate-400">
+                                P
+                              </span>
                               <div className="flex items-center gap-0.5">
                                 <input
                                   type="number"
@@ -1486,13 +1511,17 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                     handleUpdateItemMacro(idx, 'protein', e.target.value)
                                   }
                                   aria-label={`Proteína de ${item.name || 'ingrediente'}`}
-                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                  className="w-10 text-right font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none"
                                 />
-                                <span className="text-slate-400">g</span>
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  g
+                                </span>
                               </div>
                             </label>
-                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                              <span className="font-bold text-slate-500">C</span>
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/70 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500 dark:text-slate-400">
+                                C
+                              </span>
                               <div className="flex items-center gap-0.5">
                                 <input
                                   type="number"
@@ -1505,13 +1534,17 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                     handleUpdateItemMacro(idx, 'carbs', e.target.value)
                                   }
                                   aria-label={`Carbohidratos de ${item.name || 'ingrediente'}`}
-                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                  className="w-10 text-right font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none"
                                 />
-                                <span className="text-slate-400">g</span>
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  g
+                                </span>
                               </div>
                             </label>
-                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                              <span className="font-bold text-slate-500">G</span>
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/70 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500 dark:text-slate-400">
+                                G
+                              </span>
                               <div className="flex items-center gap-0.5">
                                 <input
                                   type="number"
@@ -1524,9 +1557,11 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                     handleUpdateItemMacro(idx, 'fat', e.target.value)
                                   }
                                   aria-label={`Grasas de ${item.name || 'ingrediente'}`}
-                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                  className="w-10 text-right font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none"
                                 />
-                                <span className="text-slate-400">g</span>
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  g
+                                </span>
                               </div>
                             </label>
                           </div>
@@ -1542,7 +1577,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 <button
                   type="button"
                   onClick={isEditing ? handleCloseModal : handleResetToChoose}
-                  className="rounded-2xl border border-slate-200 px-4 py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                 >
                   {isEditing ? 'Cancelar' : photoPreview ? 'Cambiar foto' : 'Volver'}
                 </button>

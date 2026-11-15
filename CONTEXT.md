@@ -44,35 +44,37 @@ CalApp/
 ├── vite.config.ts                 # Configuración Vite (base: './')
 └── src/
     ├── main.tsx                   # Punto de montaje React
-    ├── App.tsx                    # Estado raíz (perfil, entradas, fecha seleccionada, tab activo y modal)
-    ├── index.css                  # Tailwind v4 + animación scanBeam + utilidades .pt-safe / .pb-safe
-    ├── types.ts                   # Tipos TypeScript de perfil, comidas, análisis IA y evaluación diaria
+    ├── App.tsx                    # Estado raíz (perfil, entradas, tema claro/oscuro, vista previa de foto, fecha seleccionada, tab activo y modal)
+    ├── index.css                  # Tailwind v4 (`@custom-variant dark`), animación scanBeam y utilidades .pt-safe / .pb-safe
+    ├── types.ts                   # Tipos TypeScript de perfil, comidas, análisis IA, tema (`ThemeMode`) y vista previa (`PhotoPreviewData`)
     ├── vite-env.d.ts              # Declaraciones Vite client (ImportMeta.env)
     ├── utils/
     │   ├── nutrition.ts           # Fórmulas Mifflin-St Jeor, TDEE, IMC, macros, evaluateDailyStatus, fechas y parseo/escalado de porciones
-    │   └── storage.ts             # Persistencia localStorage con compactación ante límite de cuota
+    │   └── storage.ts             # Persistencia localStorage (perfil, comidas con compactación, API Key y tema claro/oscuro)
     ├── services/
     │   └── geminiService.ts       # Cliente Gemini v1beta, compresión de fotos, FOOD_DICTIONARY y sugerencias de platillos
     └── components/
         ├── BottomNav.tsx              # Barra inferior fija (Hoy, Platillos, Foto IA, Historial, Mi Perfil)
-        ├── DailyDashboardView.tsx     # Tab "Hoy": header/fecha unificados, anillo calórico, veredicto, macros y 3 comidas (con editar/eliminar)
+        ├── DailyDashboardView.tsx     # Tab "Hoy": header con fecha y botón de tema, anillo calórico, veredicto, macros y 3 comidas (miniatura clicable, editar/eliminar)
         ├── MealSuggestionsView.tsx    # Tab "Platillos": recomendaciones IA/locales por meta restante o ingredientes disponibles
-        ├── PhotoScannerModal.tsx      # Modal de registro y edición: cámara WebRTC, galería, texto manual y revisión editable
+        ├── PhotoScannerModal.tsx      # Modal de registro y edición: cámara WebRTC, galería, texto manual y revisión editable (con foto ampliable)
+        ├── PhotoPreviewModal.tsx      # Lightbox en pantalla completa para ampliar la foto de un platillo con nombre, categoría y kcal
         ├── DeleteMealConfirmModal.tsx # Diálogo de confirmación en español antes de eliminar un platillo registrado
-        ├── OnboardingOrProfileView.tsx # Registro inicial y pestaña "Mi Perfil" (incluye configuración de API Key)
-        ├── HistoryView.tsx            # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día (con editar/eliminar)
+        ├── OnboardingOrProfileView.tsx # Registro inicial y pestaña "Mi Perfil" (incluye selector Claro/Oscuro y configuración de API Key)
+        ├── HistoryView.tsx            # Tab "Historial": resumen de 7 días, gráfica de barras y detalle por día (miniatura clicable, editar/eliminar)
         └── ApiKeyTutorialBox.tsx      # Guía en 3 pasos para obtener una API Key gratis en Google AI Studio
 ```
 
 ### Detalle rápido de componentes clave
 
-- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `platillos`, `historial` y `perfil`. Gestiona `editingEntry` para reabrir `PhotoScannerModal` precargado al editar un `MealEntry` (`handleUpdateMeal`) preservando su `id`, `date`, `timestamp` y `photoDataUrl`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
-- **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera y selector de fecha (`< Hoy >`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con botón `+ Agregar`, botón **Editar** (`Pencil`) y botón **Eliminar** (`Trash2` con confirmación previa vía `DeleteMealConfirmModal`).
-- **`src/components/HistoryView.tsx`**: resumen de 7 días, gráfica de barras y detalle por día donde también se pueden **editar** (`Pencil`) o **eliminar** (`Trash2` con `DeleteMealConfirmModal`) comidas ya registradas.
+- **`src/App.tsx`**: si `!profile.onboardingCompleted`, muestra `OnboardingOrProfileView` con `isInitialOnboarding={true}` sin la barra inferior. Una vez completado el registro inicial, muestra el flujo principal con `BottomNav` y las pestañas `hoy`, `platillos`, `historial` y `perfil`. Sincroniza el estado `theme` (`ThemeMode`) con la clase `.dark` en `document.documentElement`, `localStorage` (`calapp_theme_v1`) y `<meta name="theme-color">` (`#0f172a` en oscuro / `#059669` en claro). Gestiona `editingEntry` para reabrir `PhotoScannerModal` precargado al editar un `MealEntry` (`handleUpdateMeal`) preservando su `id`, `date`, `timestamp` y `photoDataUrl`, así como `previewPhoto` para abrir `PhotoPreviewModal`. El botón central `Foto IA` selecciona automáticamente la categoría sugerida según la hora (`<12` Desayuno, `12–17` Comida, `>=18` Cena).
+- **`src/components/DailyDashboardView.tsx`**: interfaz simplificada con cabecera, selector de fecha (`< Hoy >`) y acceso rápido de tema (`Sun`/`Moon`) en una sola fila; una única tarjeta principal con anillo de progreso, mensaje directo (`Faltan ... kcal` / `¡Meta cumplida!` / `+... kcal sobre tu meta`), franja compacta de veredicto (`data-testid="daily-verdict-banner"`) y barras de macros; y secciones limpias de **Desayuno**, **Comida** y **Cena** con botón `+ Agregar`, miniatura de foto clicable (si `photoDataUrl` existe), botón **Editar** (`Pencil`) y botón **Eliminar** (`Trash2` con confirmación previa vía `DeleteMealConfirmModal`).
+- **`src/components/HistoryView.tsx`**: resumen de 7 días, gráfica de barras y detalle por día donde los registros con `photoDataUrl` muestran su miniatura clicable para verla en pantalla completa y donde también se pueden **editar** (`Pencil`) o **eliminar** (`Trash2` con `DeleteMealConfirmModal`) comidas ya registradas.
+- **`src/components/PhotoPreviewModal.tsx`**: lightbox en pantalla completa (`bg-black/85`, `z-[70]`) que muestra la imagen centrada (`max-h-[75dvh] object-contain`) acompañada de un pie compacto con nombre del platillo, categoría y calorías totales; se cierra tocando fuera, pulsando el botón `X` superior derecho o presionando `Escape`.
 - **`src/components/MealSuggestionsView.tsx`**: pestaña **Platillos** con dos modos: **Para mi meta de hoy** (calcula calorías y macros restantes según la hora o tiempo de comida elegido) y **Con lo que tengo** (chips/input de ingredientes disponibles, filtro opcional de comida y ajuste opcional a calorías restantes). Incluye selector de porción (`0.5x`, `1x`, `1.5x`) que actualiza calorías, macros e ingredientes en vivo antes de guardar como `MealEntry` en el día seleccionado.
-- **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`. Tanto al registrar como al editar (`editingEntry` + `onUpdateMeal`), mantiene `itemBases` para ofrecer controles intuitivos por ingrediente (`-`/`+` según unidad `±25` g/ml o `±0.5`, input numérico directo sin `0` bloqueado y cambio de unidad con recálculo vía `estimateSingleFoodItem`), recalcula automáticamente calorías y macros totales a partir de `items[]` (o permite editar totales directos si no hay ítems) y oculta los inputs manuales de P/C/G bajo **"Ajustar macros manualmente"** para mantener limpia la UI móvil.
+- **`src/components/PhotoScannerModal.tsx`**: pasos `choose` -> (`camera` | `manual_input`) -> `analyzing` -> `review`. Tanto al registrar como al editar (`editingEntry` + `onUpdateMeal`), permite tocar `photoPreview` en `review` para ampliarla vía `PhotoPreviewModal`, mantiene `itemBases` para ofrecer controles intuitivos por ingrediente (`-`/`+` según unidad `±25` g/ml o `±0.5`, input numérico directo sin `0` bloqueado y cambio de unidad con recálculo vía `estimateSingleFoodItem`), recalcula automáticamente calorías y macros totales a partir de `items[]` (o permite editar totales directos si no hay ítems) y oculta los inputs manuales de P/C/G bajo **"Ajustar macros manualmente"** para mantener limpia la UI móvil.
 - **`src/components/DeleteMealConfirmModal.tsx`**: modal en español (en lugar de `window.confirm()`) que muestra el nombre del platillo, su categoría y calorías antes de confirmar **Eliminar** o **Cancelar**.
-- **`src/components/OnboardingOrProfileView.tsx`**: durante `isInitialOnboarding` oculta la tarjeta de cálculo calórico (`Calorías diarias requeridas` / IMC / macros) y muestra los campos de datos personales limpios usando `placeholder` para no obligar a borrar ejemplos previos. En `Mi Perfil` sí muestra la tarjeta resumen y permite editar o fijar una meta manual (`customCalorieTarget`).
+- **`src/components/OnboardingOrProfileView.tsx`**: durante `isInitialOnboarding` oculta la tarjeta de cálculo calórico (`Calorías diarias requeridas` / IMC / macros) y muestra los campos de datos personales limpios usando `placeholder` para no obligar a borrar ejemplos previos. En `Mi Perfil` sí muestra la tarjeta resumen, incluye el selector de **Apariencia** (**Claro** / **Oscuro**) y permite editar o fijar una meta manual (`customCalorieTarget`).
 
 ---
 
@@ -145,10 +147,14 @@ Evalúa las calorías consumidas frente a `targetCalories`:
   - `calapp_user_profile_v1`: perfil `UserProfile` (`onboardingCompleted: false` por defecto).
   - `calapp_meal_entries_v1`: arreglo de `MealEntry`. Si se alcanza la cuota del navegador por almacenar muchas imágenes en DataURL, `saveMealEntries` recorta `photoDataUrl` de las entradas más antiguas automáticamente.
   - `calapp_gemini_api_key`: clave personal de Google AI Studio.
+  - `calapp_theme_v1`: preferencia de tema (`'light' | 'dark'`); si no existe, detecta `window.matchMedia('(prefers-color-scheme: dark)')`.
 
 ---
 
 ## 6. Decisiones de UX Móvil Importantes
+
+- **Modo Oscuro determinista (`src/index.css` y `App.tsx`):** Se declara `@custom-variant dark (&:where(.dark, .dark *));` para Tailwind CSS v4 y se sincroniza la clase `.dark` en `<html>` junto con `<meta name="theme-color">` (`#0f172a` en oscuro y `#059669` en claro).
+- **Vista previa de foto en pantalla completa sin galería separada (`PhotoPreviewModal.tsx`):** En lugar de duplicar vistas o historiales de imágenes, cualquier registro con `photoDataUrl` en **Hoy**, **Historial** o el paso `review` de `PhotoScannerModal.tsx` hace su miniatura clicable para inspeccionarla en detalle.
 
 - **Safe area superior e inferior (`src/index.css`):** `.pt-safe` aplica `padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 0.85rem))` en pantallas `<= 640px` para evitar que el notch o la barra de estado de iPhone se sobrepongan al encabezado; `.pb-safe` respeta el indicador inferior en `BottomNav.tsx`, `PhotoScannerModal.tsx` y `DeleteMealConfirmModal.tsx`. Los modales limitan su altura con `max-h-[86dvh]`.
 - **Inputs sin `0` bloqueado ni ejemplos forzados (`OnboardingOrProfileView.tsx` y `PhotoScannerModal.tsx`):**
@@ -175,7 +181,8 @@ npm run preview  # Vista previa local del build de producción
 
 > **Regla de mantenimiento:** Actualizar `CONTEXT.md` (y `README.md` si cambian funcionalidades visibles) después de cada cambio relevante en la aplicación.
 
-- **Simplificación de controles de porción (`PhotoScannerModal.tsx` y `nutrition.ts`):** Se retiró el bloque **"Tamaño de porción del platillo"** (`0.5x`–`2x`, `±0.25x`, `scaleAnalysisByMultiplier`) y la fila de chips `½`, `1`, `1.5`, `2` por ingrediente, conservando el stepper `-`/`+`, el input numérico sin `0` bloqueado, el cambio de unidad con `estimateSingleFoodItem` y **"Ajustar macros manualmente"**; se mantiene intacto el selector `0.5x / 1x / 1.5x` en `MealSuggestionsView.tsx`.
+- **Modo Oscuro completo y Vista Previa de Foto (Lightbox):** Se añadió `@custom-variant dark (&:where(.dark, .dark *));` en `index.css`, persistencia de tema (`calapp_theme_v1` con fallback a `prefers-color-scheme` y sincronización de `meta[name="theme-color"]`), botón rápido `Sun`/`Moon` en `DailyDashboardView.tsx`, selector **Claro / Oscuro** en `Mi Perfil` (`OnboardingOrProfileView.tsx`) y paleta `dark:` en toda la aplicación; además, se creó `PhotoPreviewModal.tsx` para ampliar en pantalla completa la foto de cualquier platillo al pulsar su miniatura en **Hoy**, **Historial** o el paso de revisión/edición de `PhotoScannerModal.tsx` (sin galería separada).
+- **`c15b90a` — Simplificación de controles de porción (`PhotoScannerModal.tsx` y `nutrition.ts`):** Se retiró el bloque **"Tamaño de porción del platillo"** (`0.5x`–`2x`, `±0.25x`, `scaleAnalysisByMultiplier`) y la fila de chips `½`, `1`, `1.5`, `2` por ingrediente, conservando el stepper `-`/`+`, el input numérico sin `0` bloqueado, el cambio de unidad con `estimateSingleFoodItem` y **"Ajustar macros manualmente"**; se mantiene intacto el selector `0.5x / 1x / 1.5x` en `MealSuggestionsView.tsx`.
 - **`235dc71` — Ajuste intuitivo de porciones (`nutrition.ts`, `PhotoScannerModal.tsx`, `MealSuggestionsView.tsx`):** Se añadieron utilidades de parseo y escalado (`parsePortionText`, `extractItemPortionBase`, `scaleFoodItemByQuantity`, `scaleAnalysisByMultiplier`, `scaleIngredientLine`, `splitIngredientLineToPortionAndName`), referencia base `1x` inmutable en `review` con multiplicador de platillo (`0.5x`–`2x` y stepper `±0.25x`), controles `-`/`+` y chips `½/1/1.5/2` por ingrediente con recálculo automático (y vía `estimateSingleFoodItem` al cambiar de unidad), panel colapsable **"Ajustar macros manualmente"** y selector `0.5x/1x/1.5x` en las tarjetas de `Platillos`.
 - **`2bd90ed` — Confirmación antes de eliminar y edición completa de comidas:** Se añadió `DeleteMealConfirmModal.tsx` para confirmar en español antes de eliminar cualquier platillo en `Hoy` (`DailyDashboardView.tsx`) e `Historial` (`HistoryView.tsx`), y se habilitó la edición completa de comidas guardadas (`mealName`, categoría, ingredientes/porciones/kcal/P-C-G y totales directos) reutilizando `PhotoScannerModal.tsx` con `editingEntry` e inputs numéricos sin `0` bloqueado (`itemDrafts`).
 - **`a28ec87` — Actualización de `CONTEXT.md` y `README.md`:** Se documentó la pestaña `Platillos` y la arquitectura de recomendaciones en `CONTEXT.md` y `README.md`.

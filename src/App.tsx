@@ -4,14 +4,24 @@ import { DailyDashboardView } from './components/DailyDashboardView';
 import { HistoryView } from './components/HistoryView';
 import { MealSuggestionsView } from './components/MealSuggestionsView';
 import { OnboardingOrProfileView } from './components/OnboardingOrProfileView';
+import { PhotoPreviewModal } from './components/PhotoPreviewModal';
 import { PhotoScannerModal } from './components/PhotoScannerModal';
-import type { AppTab, MealCategory, MealEntry, UserProfile } from './types';
+import type {
+  AppTab,
+  MealCategory,
+  MealEntry,
+  PhotoPreviewData,
+  ThemeMode,
+  UserProfile,
+} from './types';
 import { getLocalDateKey } from './utils/nutrition';
 import {
   loadGeminiApiKey,
   loadMealEntries,
+  loadThemeMode,
   loadUserProfile,
   saveMealEntries,
+  saveThemeMode,
   saveUserProfile,
 } from './utils/storage';
 
@@ -29,6 +39,26 @@ export function App() {
   const [hasApiKey, setHasApiKey] = useState<boolean>(
     () => loadGeminiApiKey().length > 0
   );
+  const [theme, setTheme] = useState<ThemeMode>(() => loadThemeMode());
+  const [previewPhoto, setPreviewPhoto] = useState<PhotoPreviewData | null>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    saveThemeMode(theme);
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', theme === 'dark' ? '#0f172a' : '#059669');
+    }
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   useEffect(() => {
     saveUserProfile(profile);
@@ -93,8 +123,8 @@ export function App() {
   const isOnboarding = !profile.onboardingCompleted;
 
   return (
-    <div className="min-h-dvh bg-slate-100 flex justify-center">
-      <div className="w-full max-w-md min-h-dvh bg-slate-50 px-4 pt-safe shadow-xl shadow-slate-200/70">
+    <div className="min-h-dvh bg-slate-100 dark:bg-slate-950 flex justify-center transition-colors">
+      <div className="w-full max-w-md min-h-dvh bg-slate-50 dark:bg-slate-950 px-4 pt-safe shadow-xl shadow-slate-200/70 dark:shadow-none border-x border-transparent dark:border-slate-800/70 transition-colors">
         {isOnboarding ? (
           <OnboardingOrProfileView
             profile={profile}
@@ -113,6 +143,9 @@ export function App() {
                 onEditEntry={handleStartEditEntry}
                 onDeleteEntry={handleDeleteEntry}
                 hasApiKey={hasApiKey}
+                theme={theme}
+                onToggleTheme={handleToggleTheme}
+                onPreviewPhoto={setPreviewPhoto}
               />
             )}
 
@@ -136,6 +169,7 @@ export function App() {
                 }}
                 onEditEntry={handleStartEditEntry}
                 onDeleteEntry={handleDeleteEntry}
+                onPreviewPhoto={setPreviewPhoto}
               />
             )}
 
@@ -144,6 +178,8 @@ export function App() {
                 profile={profile}
                 isInitialOnboarding={false}
                 onSaveProfile={handleSaveProfile}
+                theme={theme}
+                onChangeTheme={setTheme}
               />
             )}
 
@@ -163,8 +199,14 @@ export function App() {
                 onClose={handleCloseScanner}
                 onSaveMeal={handleSaveMeal}
                 onUpdateMeal={handleUpdateMeal}
+                onPreviewPhoto={setPreviewPhoto}
               />
             )}
+
+            <PhotoPreviewModal
+              preview={previewPhoto}
+              onClose={() => setPreviewPhoto(null)}
+            />
           </>
         )}
       </div>

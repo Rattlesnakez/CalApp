@@ -367,28 +367,29 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
       {/* Encabezado limpio */}
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
             Ideas inteligentes • {formatDateLabel(selectedDate)}
           </p>
           <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">
-              Platillos <span className="text-emerald-600">IA</span>
+            <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+              Platillos{' '}
+              <span className="text-emerald-600 dark:text-emerald-400">IA</span>
             </h1>
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
-                hasApiKey ? 'bg-emerald-500' : 'bg-slate-300'
+                hasApiKey ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
               }`}
               title={hasApiKey ? 'Gemini IA activa' : 'Modo Demo'}
             />
           </div>
         </div>
-        <span className="rounded-full bg-white border border-slate-200 px-3 py-1 text-[11px] font-bold text-slate-600 shrink-0">
+        <span className="rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
           {GOAL_LABELS[profile.goal].badge}
         </span>
       </div>
 
       {/* Selector superior de 2 modos */}
-      <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-200/70 p-1">
+      <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-200/70 dark:bg-slate-800/90 p-1">
         <button
           type="button"
           onClick={() => {
@@ -397,8 +398,8 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
           }}
           className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-xs font-bold transition ${
             mode === 'goal'
-              ? 'bg-white text-emerald-700 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
@@ -412,8 +413,8 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
           }}
           className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 px-2 text-xs font-bold transition ${
             mode === 'pantry'
-              ? 'bg-white text-emerald-700 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
           }`}
         >
           <ChefHat className="w-3.5 h-3.5 shrink-0" />
@@ -423,15 +424,17 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
       {/* MODO 1: Para mi meta de hoy */}
       {mode === 'goal' && (
-        <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+        <div className="rounded-3xl bg-white dark:bg-slate-900 p-4 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3.5">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 Presupuesto restante hoy
               </p>
               <p
                 className={`text-xl font-black leading-tight ${
-                  remainingCalories < 0 ? 'text-rose-600' : 'text-slate-900'
+                  remainingCalories < 0
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-slate-900 dark:text-slate-100'
                 }`}
               >
                 {remainingCalories > 0
@@ -441,15 +444,15 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                     : `+${Math.abs(remainingCalories).toLocaleString('es-MX')} kcal excedidas`}
               </p>
             </div>
-            <div className="text-right text-[11px] font-semibold text-slate-500">
+            <div className="text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">
               <p>P: {Math.round(remainingMacros.protein)}g • C: {Math.round(remainingMacros.carbs)}g</p>
               <p>G: {Math.round(remainingMacros.fat)}g restantes</p>
             </div>
           </div>
 
           <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-emerald-600" />
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Tiempo de comida
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -464,7 +467,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                     className={`rounded-2xl py-2 text-xs font-bold border transition ${
                       active
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
                     {MEAL_CATEGORY_META[cat].label}
@@ -494,11 +497,11 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
       {mode === 'pantry' && (
         <form
           onSubmit={handleGeneratePantryMeals}
-          className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80 space-y-3.5"
+          className="rounded-3xl bg-white dark:bg-slate-900 p-4 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3.5"
         >
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200">
                 ¿Qué ingredientes tienes disponibles?
               </label>
               {pantryIngredients.length > 0 && (
@@ -508,7 +511,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                     setPantryIngredients([]);
                     setIngredientInput('');
                   }}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
                 >
                   <Trash2 className="w-3 h-3" />
                   Limpiar
@@ -523,12 +526,12 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                 onChange={(e) => setIngredientInput(e.target.value)}
                 onKeyDown={handleInputKeyDown}
                 placeholder="Ej. pollo, arroz, aguacate..."
-                className="flex-1 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                className="flex-1 min-w-0 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={handleAddFromInput}
-                className="rounded-2xl bg-slate-900 hover:bg-slate-800 text-white p-2.5 shrink-0 transition"
+                className="rounded-2xl bg-slate-900 dark:bg-emerald-600 hover:bg-slate-800 dark:hover:bg-emerald-700 text-white p-2.5 shrink-0 transition"
                 aria-label="Agregar ingrediente"
               >
                 <Plus className="w-5 h-5" />
@@ -541,7 +544,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                 {pantryIngredients.map((item) => (
                   <span
                     key={item}
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-800"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-300"
                   >
                     {item}
                     <button
@@ -551,7 +554,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                           prev.filter((x) => x !== item)
                         )
                       }
-                      className="text-emerald-600 hover:text-emerald-900"
+                      className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200"
                       aria-label={`Quitar ${item}`}
                     >
                       <X className="w-3.5 h-3.5" />
@@ -563,7 +566,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
             {/* Sugerencias rápidas */}
             <div className="mt-2.5">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                 Toca para agregar rápido
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -579,7 +582,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border transition ${
                         selected
                           ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                       }`}
                     >
                       {selected ? `✓ ${ing}` : `+ ${ing}`}
@@ -592,7 +595,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
           {/* Filtro opcional de tiempo de comida */}
           <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
               Tiempo de comida (opcional)
             </p>
             <div className="grid grid-cols-4 gap-1.5">
@@ -613,7 +616,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                     className={`rounded-xl py-1.5 px-1 text-[11px] font-bold border transition truncate ${
                       active
                         ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
                     {opt.label}
@@ -623,7 +626,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
             </div>
           </div>
 
-          <label className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 border border-slate-200/80 px-3 py-2.5 text-xs font-semibold text-slate-700 cursor-pointer">
+          <label className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer">
             <span>
               Ajustar porciones a mis{' '}
               <strong>
@@ -655,7 +658,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
       )}
 
       {errorMsg && (
-        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-700">
+        <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 p-3 text-xs font-semibold text-rose-700 dark:text-rose-300">
           {errorMsg}
         </div>
       )}
@@ -669,14 +672,14 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
       {/* Lista de Resultados */}
       {isLoading ? (
-        <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200/80 flex flex-col items-center justify-center text-center gap-2.5">
-          <Loader2 className="w-7 h-7 text-emerald-600 animate-spin" />
-          <p className="text-sm font-extrabold text-slate-900">
+        <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col items-center justify-center text-center gap-2.5">
+          <Loader2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400 animate-spin" />
+          <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
             {mode === 'goal'
               ? 'Buscando platillos ideales para tu meta...'
               : 'Creando recetas con tus ingredientes...'}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Calculando porciones, calorías y macronutrientes
           </p>
         </div>
@@ -690,7 +693,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
             return (
               <article
                 key={meal.id}
-                className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200/80 space-y-3"
+                className="rounded-3xl bg-white dark:bg-slate-900 p-4 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -701,21 +704,21 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                         {catMeta.label}
                       </span>
                       {meal.isDemo && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                        <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                           Sugerencia local
                         </span>
                       )}
                     </div>
-                    <h2 className="text-sm font-extrabold text-slate-900 leading-snug">
+                    <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 leading-snug">
                       {meal.mealName}
                     </h2>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-lg font-black text-emerald-700 leading-none">
+                    <p className="text-lg font-black text-emerald-700 dark:text-emerald-400 leading-none">
                       {scaled.totalCalories}
                     </p>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">
                       kcal
                     </span>
                   </div>
@@ -723,27 +726,27 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
                 {/* Desglose de Macros */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-sky-50/70 py-1.5 px-2">
-                    <span className="block text-[10px] text-slate-500">
+                  <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/40 py-1.5 px-2">
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">
                       Proteína
                     </span>
-                    <span className="text-xs font-extrabold text-sky-700">
+                    <span className="text-xs font-extrabold text-sky-700 dark:text-sky-400">
                       {scaled.protein} g
                     </span>
                   </div>
-                  <div className="rounded-xl bg-amber-50/70 py-1.5 px-2">
-                    <span className="block text-[10px] text-slate-500">
+                  <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/40 py-1.5 px-2">
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">
                       Carbos
                     </span>
-                    <span className="text-xs font-extrabold text-amber-700">
+                    <span className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
                       {scaled.carbs} g
                     </span>
                   </div>
-                  <div className="rounded-xl bg-rose-50/70 py-1.5 px-2">
-                    <span className="block text-[10px] text-slate-500">
+                  <div className="rounded-xl bg-rose-50/70 dark:bg-rose-950/40 py-1.5 px-2">
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">
                       Grasas
                     </span>
-                    <span className="text-xs font-extrabold text-rose-700">
+                    <span className="text-xs font-extrabold text-rose-700 dark:text-rose-400">
                       {scaled.fat} g
                     </span>
                   </div>
@@ -758,14 +761,14 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                     <div className="space-y-1 text-[11px]">
                       {meal.matchedIngredients &&
                         meal.matchedIngredients.length > 0 && (
-                          <p className="text-emerald-800 font-semibold">
+                          <p className="text-emerald-800 dark:text-emerald-300 font-semibold">
                             <span className="font-bold">Usa tuyos:</span>{' '}
                             {meal.matchedIngredients.join(', ')}
                           </p>
                         )}
                       {meal.extraIngredients &&
                         meal.extraIngredients.length > 0 && (
-                          <p className="text-slate-500">
+                          <p className="text-slate-500 dark:text-slate-400">
                             <span className="font-bold">Extra básico:</span>{' '}
                             {meal.extraIngredients.join(', ')}
                           </p>
@@ -774,27 +777,31 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                   )}
 
                 {/* Ingredientes + Tip de preparación */}
-                <div className="rounded-2xl bg-slate-50 p-3 space-y-1.5 text-xs">
+                <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3 space-y-1.5 text-xs">
                   {scaled.ingredients.length > 0 && (
-                    <p className="text-slate-700 leading-relaxed">
-                      <strong className="text-slate-900">Ingredientes:</strong>{' '}
+                    <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                      <strong className="text-slate-900 dark:text-slate-100">
+                        Ingredientes:
+                      </strong>{' '}
                       {scaled.ingredients.join(' • ')}
                     </p>
                   )}
-                  <p className="text-slate-600 leading-relaxed">
-                    <strong className="text-slate-800">Preparación:</strong>{' '}
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <strong className="text-slate-800 dark:text-slate-100">
+                      Preparación:
+                    </strong>{' '}
                     {meal.preparationTip}
                   </p>
                 </div>
 
                 {/* Por qué encaja */}
-                <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50/70 border border-emerald-100 rounded-xl px-3 py-2">
+                <p className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800/60 rounded-xl px-3 py-2">
                   {meal.fitReason}
                 </p>
 
                 {/* Selector compacto de porción */}
-                <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 border border-slate-200/80 px-3 py-2">
-                  <span className="text-[11px] font-bold text-slate-600">
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 px-3 py-2">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
                     Porción
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -813,7 +820,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
                             active
                               ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300'
                           }`}
                         >
                           {opt}x
@@ -829,7 +836,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                   onClick={() => handleRegisterSuggestedMeal(meal)}
                   className={`w-full rounded-2xl py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
                     isRegistered
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                       : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white shadow-sm'
                   }`}
                 >
@@ -855,14 +862,14 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
         </div>
       ) : (
         mode === 'pantry' && (
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200/80 text-center space-y-2">
-            <div className="mx-auto w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <div className="rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 text-center space-y-2">
+            <div className="mx-auto w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Utensils className="w-5 h-5" />
             </div>
-            <p className="text-sm font-extrabold text-slate-900">
+            <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
               Arma tu comida con lo que tienes
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Escribe tus ingredientes o toca las etiquetas rápidas de arriba y
               presiona <strong>Recomendar con mis ingredientes</strong>.
             </p>

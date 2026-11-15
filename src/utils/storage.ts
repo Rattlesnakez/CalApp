@@ -1,8 +1,9 @@
-import type { MealEntry, UserProfile } from '../types';
+import type { MealEntry, ThemeMode, UserProfile } from '../types';
 
 const PROFILE_STORAGE_KEY = 'calapp_user_profile_v1';
 const MEALS_STORAGE_KEY = 'calapp_meal_entries_v1';
 const API_KEY_STORAGE_KEY = 'calapp_gemini_api_key';
+const THEME_STORAGE_KEY = 'calapp_theme_v1';
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   name: 'Usuario',
@@ -91,5 +92,31 @@ export function saveGeminiApiKey(apiKey: string): void {
     }
   } catch (err) {
     console.error('Error guardando API Key:', err);
+  }
+}
+
+export function loadThemeMode(): ThemeMode {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'dark' || saved === 'light') {
+      return saved;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ) {
+      return 'dark';
+    }
+  } catch {
+    // Fallback
+  }
+  return 'light';
+}
+
+export function saveThemeMode(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+  } catch (err) {
+    console.error('Error guardando tema:', err);
   }
 }
