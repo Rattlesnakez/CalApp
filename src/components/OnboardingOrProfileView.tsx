@@ -37,6 +37,21 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
   onSaveProfile,
 }) => {
   const [draft, setDraft] = useState<UserProfile>(profile);
+  const [nameInput, setNameInput] = useState<string>(() =>
+    isInitialOnboarding || profile.name === 'Usuario' ? '' : profile.name
+  );
+  const [ageInput, setAgeInput] = useState<string>(() =>
+    isInitialOnboarding ? '' : String(profile.age)
+  );
+  const [weightInput, setWeightInput] = useState<string>(() =>
+    isInitialOnboarding ? '' : String(profile.weightKg)
+  );
+  const [heightInput, setHeightInput] = useState<string>(() =>
+    isInitialOnboarding ? '' : String(profile.heightCm)
+  );
+  const [customTargetInput, setCustomTargetInput] = useState<string>(() =>
+    profile.customCalorieTarget ? String(profile.customCalorieTarget) : ''
+  );
   const [useCustomTarget, setUseCustomTarget] = useState<boolean>(
     Boolean(profile.customCalorieTarget)
   );
@@ -47,16 +62,26 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
 
   useEffect(() => {
     setDraft(profile);
+    setNameInput(
+      isInitialOnboarding || profile.name === 'Usuario' ? '' : profile.name
+    );
+    setAgeInput(isInitialOnboarding ? '' : String(profile.age));
+    setWeightInput(isInitialOnboarding ? '' : String(profile.weightKg));
+    setHeightInput(isInitialOnboarding ? '' : String(profile.heightCm));
+    setCustomTargetInput(
+      profile.customCalorieTarget ? String(profile.customCalorieTarget) : ''
+    );
     setUseCustomTarget(Boolean(profile.customCalorieTarget));
-  }, [profile]);
+  }, [profile, isInitialOnboarding]);
 
   const effectiveProfile: UserProfile = {
     ...draft,
-    age: Math.max(12, Math.min(100, Number(draft.age) || 25)),
-    weightKg: Math.max(30, Math.min(250, Number(draft.weightKg) || 70)),
-    heightCm: Math.max(110, Math.min(230, Number(draft.heightCm) || 170)),
+    name: nameInput.trim() || 'Usuario',
+    age: Math.max(12, Math.min(100, Number(ageInput) || 28)),
+    weightKg: Math.max(30, Math.min(250, Number(weightInput) || 70)),
+    heightCm: Math.max(110, Math.min(230, Number(heightInput) || 170)),
     customCalorieTarget: useCustomTarget
-      ? Math.max(800, Number(draft.customCalorieTarget) || 2000)
+      ? Math.max(800, Number(customTargetInput) || 2000)
       : null,
   };
 
@@ -75,7 +100,7 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
     saveGeminiApiKey(apiKeyInput);
     onSaveProfile({
       ...effectiveProfile,
-      name: draft.name.trim() || 'Usuario',
+      name: nameInput.trim() || 'Usuario',
       onboardingCompleted: true,
     });
     if (!isInitialOnboarding) {
@@ -192,8 +217,8 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
           </label>
           <input
             type="text"
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
             placeholder="Ej. Carlos"
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none"
           />
@@ -236,12 +261,12 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
             </label>
             <input
               type="number"
+              inputMode="numeric"
               min={12}
               max={100}
-              value={draft.age}
-              onChange={(e) =>
-                setDraft({ ...draft, age: Number(e.target.value) })
-              }
+              value={ageInput}
+              onChange={(e) => setAgeInput(e.target.value)}
+              placeholder="Ej. 25"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 text-center focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
           </div>
@@ -251,13 +276,13 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
             </label>
             <input
               type="number"
+              inputMode="decimal"
               min={30}
               max={250}
-              step="0.5"
-              value={draft.weightKg}
-              onChange={(e) =>
-                setDraft({ ...draft, weightKg: Number(e.target.value) })
-              }
+              step="any"
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              placeholder="Ej. 70"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 text-center focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
           </div>
@@ -267,12 +292,12 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
             </label>
             <input
               type="number"
+              inputMode="numeric"
               min={110}
               max={230}
-              value={draft.heightCm}
-              onChange={(e) =>
-                setDraft({ ...draft, heightCm: Number(e.target.value) })
-              }
+              value={heightInput}
+              onChange={(e) => setHeightInput(e.target.value)}
+              placeholder="Ej. 170"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 text-center focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
           </div>
@@ -372,8 +397,8 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
               onChange={(e) => {
                 const checked = e.target.checked;
                 setUseCustomTarget(checked);
-                if (checked && !draft.customCalorieTarget) {
-                  setDraft({ ...draft, customCalorieTarget: targetCalories });
+                if (checked && !customTargetInput) {
+                  setCustomTargetInput(String(targetCalories));
                 }
               }}
               className="h-4 w-4 accent-emerald-600 rounded"
@@ -383,16 +408,13 @@ export const OnboardingOrProfileView: React.FC<OnboardingOrProfileViewProps> = (
             <div className="mt-2 flex items-center gap-2">
               <input
                 type="number"
+                inputMode="numeric"
                 min={800}
                 max={6000}
                 step={50}
-                value={draft.customCalorieTarget ?? targetCalories}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    customCalorieTarget: Number(e.target.value),
-                  })
-                }
+                value={customTargetInput}
+                onChange={(e) => setCustomTargetInput(e.target.value)}
+                placeholder={String(targetCalories)}
                 className="w-full rounded-2xl border border-emerald-300 bg-emerald-50/40 px-3.5 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
               />
               <span className="text-xs font-semibold text-slate-500 shrink-0">

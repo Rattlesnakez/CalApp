@@ -697,10 +697,15 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     <div className="flex items-center gap-1.5 shrink-0">
                       <input
                         type="number"
+                        inputMode="numeric"
                         min={0}
-                        value={item.calories}
+                        value={item.calories === 0 ? '' : item.calories}
+                        placeholder="0"
                         onChange={(e) =>
-                          handleUpdateItemCalories(idx, Number(e.target.value))
+                          handleUpdateItemCalories(
+                            idx,
+                            e.target.value === '' ? 0 : Number(e.target.value)
+                          )
                         }
                         className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-right text-slate-900"
                       />
