@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Camera,
@@ -8,6 +8,7 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  RefreshCw,
   Sparkles,
   Trash2,
   X,
@@ -38,7 +39,7 @@ interface PhotoScannerModalProps {
   onSaveMeal: (entry: MealEntry) => void;
 }
 
-type ModalStep = 'choose' | 'manual_input' | 'analyzing' | 'review';
+type ModalStep = 'choose' | 'camera' | 'manual_input' | 'analyzing' | 'review';
 
 const MANUAL_EXAMPLES: Record<MealCategory, string[]> = {
   desayuno: [
@@ -81,17 +82,180 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   const [isEstimatingExtra, setIsEstimatingExtra] = useState(false);
   const [showAddItemForm, setShowAddItemForm] = useState(false);
 
+  // Estado y referencias para cámara integrada (WebRTC)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
+  const [showNativeFallback, setShowNativeFallback] = useState<boolean>(false);
+
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequestIdRef = useRef<number>(0);
+
+  const stopCameraStream = useCallback(() => {
+    cameraRequestIdRef.current += 1;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraReady(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      stopCameraStream();
+    }
+  }, [isOpen, stopCameraStream]);
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, [stopCameraStream]);
+
+  useEffect(() => {
+    if (step === 'camera' && videoRef.current && streamRef.current) {
+      const video = videoRef.current;
+      if (video.srcObject !== streamRef.current) {
+        video.srcObject = streamRef.current;
+      }
+      video.play().catch(() => {});
+    }
+  }, [step, facingMode]);
 
   if (!isOpen) return null;
 
+  const handleCloseModal = () => {
+    stopCameraStream();
+    onClose();
+  };
+
   const handleResetToChoose = () => {
+    stopCameraStream();
     setStep('choose');
     setPhotoPreview(undefined);
     setAnalysis(null);
     setErrorMsg('');
     setShowAddItemForm(false);
+    setShowNativeFallback(false);
+  };
+
+  const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
+    stopCameraStream();
+    const requestId = ++cameraRequestIdRef.current;
+    setErrorMsg('');
+    setShowNativeFallback(false);
+    setFacingMode(mode);
+    setStep('camera');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStep('choose');
+      setShowNativeFallback(true);
+      setErrorMsg(
+        'Tu navegador no permite abrir la cámara integrada aquí. Usa "Subir Foto" o la cámara del teléfono como respaldo.'
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: mode },
+          width: { ideal: 1280 },
+          height: { ideal: 1280 },
+        },
+        audio: false,
+      });
+
+      if (requestId !== cameraRequestIdRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+    } catch (err) {
+      if (requestId !== cameraRequestIdRef.current) return;
+      stopCameraStream();
+      setStep('choose');
+      setShowNativeFallback(true);
+      const isDenied =
+        err instanceof DOMException &&
+        (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+      const isNotFound =
+        err instanceof DOMException && err.name === 'NotFoundError';
+      setErrorMsg(
+        isDenied
+          ? 'Permiso de cámara denegado. Actívalo en tu navegador o usa la cámara del teléfono como respaldo.'
+          : isNotFound
+            ? 'No se detectó cámara disponible en el dispositivo.'
+            : 'No se pudo abrir la cámara integrada. Puedes usar la cámara del teléfono como respaldo.'
+      );
+    }
+  };
+
+  const handleToggleCameraFacing = () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    void startCamera(nextMode);
+  };
+
+  const handleCaptureFromVideo = async () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+
+    const maxDim = 1024;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    if (width > maxDim || height > maxDim) {
+      if (width >= height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    const base64 = dataUrl.split(',')[1] ?? '';
+
+    stopCameraStream();
+    setErrorMsg('');
+    setPhotoPreview(dataUrl);
+    setAnalyzingLabel('La IA está detectando tus alimentos...');
+    setStep('analyzing');
+
+    try {
+      const result = await analyzeFoodPhoto({
+        base64,
+        mimeType: 'image/jpeg',
+        category,
+      });
+
+      setAnalysis(result);
+      setStep('review');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error al analizar la foto.';
+      setErrorMsg(message);
+      setStep('choose');
+    }
   };
 
   const handleFileSelected = async (
@@ -305,7 +469,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="Cerrar escáner"
           >
@@ -342,23 +506,35 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-700">
-              {errorMsg}
+            <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-700 space-y-2">
+              <p>{errorMsg}</p>
+              {showNativeFallback && (
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-rose-200 px-3 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100/60"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  Abrir cámara del teléfono (respaldo)
+                </button>
+              )}
             </div>
           )}
+
+          {/* Input oculto de respaldo para cámara nativa */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
 
           {/* PASO 1: Elegir fuente de imagen */}
           {step === 'choose' && (
             <div className="space-y-4">
-              {/* Inputs ocultos para cámara y galería */}
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileSelected}
-                className="hidden"
-              />
+              {/* Input oculto para galería */}
               <input
                 ref={galleryInputRef}
                 type="file"
@@ -370,7 +546,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => void startCamera('environment')}
                   className="flex flex-col items-center justify-center gap-2 rounded-3xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white p-5 shadow-lg shadow-emerald-600/25 transition"
                 >
                   <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
@@ -379,7 +555,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                   <span className="text-sm font-bold text-center leading-tight">
                     Tomar Foto
                     <span className="block text-[11px] font-normal text-emerald-100 mt-0.5">
-                      Usar cámara
+                      Cámara integrada
                     </span>
                   </span>
                 </button>
@@ -459,6 +635,73 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               >
                 <Edit3 className="w-4 h-4 text-slate-500" />
                 Escribir comida manualmente (cálculo automático)
+              </button>
+            </div>
+          )}
+
+          {/* PASO 1A: Cámara Integrada en Vivo */}
+          {step === 'camera' && (
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopCameraStream();
+                    setErrorMsg('');
+                    setStep('choose');
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleCameraFacing}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700 transition"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Cambiar cámara
+                </button>
+              </div>
+
+              <div className="relative w-full aspect-square max-h-[45dvh] rounded-3xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={() => setIsCameraReady(true)}
+                  onCanPlay={() => setIsCameraReady(true)}
+                  className="w-full h-full object-cover"
+                />
+
+                {/* Guías visuales para encuadrar el plato */}
+                <div className="pointer-events-none absolute inset-4">
+                  <div className="absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-emerald-400 rounded-tl-xl" />
+                  <div className="absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-emerald-400 rounded-tr-xl" />
+                  <div className="absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-emerald-400 rounded-bl-xl" />
+                  <div className="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-emerald-400 rounded-br-xl" />
+                </div>
+
+                {!isCameraReady && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/80 text-white">
+                    <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
+                    <span className="text-xs font-semibold text-slate-200">
+                      Iniciando cámara...
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                disabled={!isCameraReady}
+                onClick={() => void handleCaptureFromVideo()}
+                className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.99] text-white py-3.5 text-sm font-extrabold shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition"
+              >
+                <Camera className="w-5 h-5" />
+                Capturar platillo
               </button>
             </div>
           )}
