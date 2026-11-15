@@ -12,7 +12,6 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  Scale,
   Sparkles,
   Trash2,
   X,
@@ -27,9 +26,7 @@ import {
   type ItemPortionBase,
   MEAL_CATEGORY_META,
   extractItemPortionBase,
-  formatQuantityNumber,
   parsePortionText,
-  scaleAnalysisByMultiplier,
   scaleFoodItemByQuantity,
 } from '../utils/nutrition';
 import {
@@ -70,21 +67,6 @@ const MANUAL_EXAMPLES: Record<MealCategory, string[]> = {
   ],
 };
 
-const MEAL_MULTIPLIER_CHIPS: Array<{ value: number; label: string }> = [
-  { value: 0.5, label: '0.5x Media' },
-  { value: 0.75, label: '0.75x' },
-  { value: 1, label: '1x Normal' },
-  { value: 1.5, label: '1.5x' },
-  { value: 2, label: '2x Doble' },
-];
-
-const ITEM_QUICK_QUANTITIES: Array<{ value: number; label: string }> = [
-  { value: 0.5, label: '½' },
-  { value: 1, label: '1' },
-  { value: 1.5, label: '1.5' },
-  { value: 2, label: '2' },
-];
-
 export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   isOpen,
   initialCategory,
@@ -98,9 +80,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   const [category, setCategory] = useState<MealCategory>(initialCategory);
   const [step, setStep] = useState<ModalStep>('choose');
   const [photoPreview, setPhotoPreview] = useState<string | undefined>(undefined);
-  const [baseAnalysis, setBaseAnalysis] = useState<MealAnalysisResult | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
-  const [mealMultiplier, setMealMultiplier] = useState<number>(1);
   const [itemBases, setItemBases] = useState<ItemPortionBase[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [manualText, setManualText] = useState<string>('');
@@ -145,17 +125,12 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   }, []);
 
   const initializeReviewState = useCallback((result: MealAnalysisResult) => {
-    const clonedBase: MealAnalysisResult = {
+    const cloned: MealAnalysisResult = {
       ...result,
       items: result.items.map((it) => ({ ...it })),
     };
-    setBaseAnalysis(clonedBase);
-    setAnalysis({
-      ...clonedBase,
-      items: clonedBase.items.map((it) => ({ ...it })),
-    });
-    setMealMultiplier(1);
-    setItemBases(clonedBase.items.map(extractItemPortionBase));
+    setAnalysis(cloned);
+    setItemBases(cloned.items.map(extractItemPortionBase));
     setItemDrafts({});
     setExpandedMacros({});
     setEditingPortionTextIdx(null);
@@ -189,9 +164,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     } else {
       setCategory(initialCategory);
       setPhotoPreview(undefined);
-      setBaseAnalysis(null);
       setAnalysis(null);
-      setMealMultiplier(1);
       setItemBases([]);
       setExpandedMacros({});
       setEditingPortionTextIdx(null);
@@ -230,9 +203,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     stopCameraStream();
     setStep('choose');
     setPhotoPreview(undefined);
-    setBaseAnalysis(null);
     setAnalysis(null);
-    setMealMultiplier(1);
     setItemBases([]);
     setExpandedMacros({});
     setEditingPortionTextIdx(null);
@@ -462,26 +433,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
   };
 
-  const syncCustomBase = (nextAnalysis: MealAnalysisResult) => {
-    setBaseAnalysis({
-      ...nextAnalysis,
-      items: nextAnalysis.items.map((it) => ({ ...it })),
-    });
-    if (mealMultiplier !== 1) {
-      setMealMultiplier(1);
-    }
-  };
-
-  const handleApplyMealMultiplier = (rawMultiplier: number) => {
-    if (!baseAnalysis) return;
-    const clamped = Math.min(5, Math.max(0.25, Number(rawMultiplier.toFixed(2))));
-    const scaled = scaleAnalysisByMultiplier(baseAnalysis, clamped);
-    setMealMultiplier(clamped);
-    setAnalysis(scaled);
-    setItemDrafts({});
-    setEditingPortionTextIdx(null);
-  };
-
   const applyItemQuantityChange = (
     index: number,
     newQty: number,
@@ -517,7 +468,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       }
       return next;
     });
-    syncCustomBase(nextAnalysis);
   };
 
   const handleStepItemQuantity = (index: number, delta: number) => {
@@ -532,10 +482,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       Number((currentQty + delta).toFixed(2))
     );
 
-    applyItemQuantityChange(index, nextQty);
-  };
-
-  const handleSetItemQuantity = (index: number, nextQty: number) => {
     applyItemQuantityChange(index, nextQty);
   };
 
@@ -620,7 +566,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         delete next[`${index}_fat`];
         return next;
       });
-      syncCustomBase(nextAnalysis);
     } finally {
       setReestimatingIdx(null);
       setEditingPortionTextIdx(null);
@@ -650,7 +595,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           : prev[idx] ?? extractItemPortionBase(it)
       )
     );
-    syncCustomBase(nextAnalysis);
   };
 
   const handleUpdateItemMacro = (
@@ -679,7 +623,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
           : prev[idx] ?? extractItemPortionBase(it)
       )
     );
-    syncCustomBase(nextAnalysis);
   };
 
   const handleUpdateItemName = (index: number, value: string) => {
@@ -688,22 +631,11 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       idx === index ? { ...item, name: value } : item
     );
     setAnalysis({ ...analysis, items: nextItems });
-    if (baseAnalysis) {
-      setBaseAnalysis({
-        ...baseAnalysis,
-        items: baseAnalysis.items.map((item, idx) =>
-          idx === index ? { ...item, name: value } : item
-        ),
-      });
-    }
   };
 
   const handleUpdateMealName = (value: string) => {
     if (!analysis) return;
     setAnalysis({ ...analysis, mealName: value });
-    if (baseAnalysis) {
-      setBaseAnalysis({ ...baseAnalysis, mealName: value });
-    }
   };
 
   const handleUpdateDirectTotal = (
@@ -712,12 +644,10 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   ) => {
     if (!analysis) return;
     setItemDrafts((prev) => ({ ...prev, [`total_${field}`]: rawValue }));
-    const nextAnalysis: MealAnalysisResult = {
+    setAnalysis({
       ...analysis,
       [field]: parseNumericInput(rawValue),
-    };
-    setAnalysis(nextAnalysis);
-    syncCustomBase(nextAnalysis);
+    });
   };
 
   const handleDeleteItem = (index: number) => {
@@ -734,7 +664,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     setEditingPortionTextIdx(null);
     setItemBases(nextItems.map(extractItemPortionBase));
     setAnalysis(nextAnalysis);
-    syncCustomBase(nextAnalysis);
   };
 
   const handleAddExtraItem = async () => {
@@ -776,7 +705,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     setItemDrafts({});
     setItemBases((prev) => [...prev, extractItemPortionBase(added)]);
     setAnalysis(nextAnalysis);
-    syncCustomBase(nextAnalysis);
     setNewItemName('');
     setNewItemPortion('1 porción');
     setNewItemCalories('');
@@ -1173,8 +1101,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 </div>
               )}
 
-              {/* Nombre del platillo + multiplicador de porción + resumen */}
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-3">
+              {/* Nombre del platillo + resumen */}
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-2.5">
                 <div>
                   <label className="block text-[11px] font-bold text-emerald-800 uppercase mb-1">
                     Nombre del platillo
@@ -1186,58 +1114,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     placeholder="Ej. Chilaquiles verdes con pollo"
                     className="w-full rounded-xl bg-white border border-emerald-200 px-3 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
                   />
-                </div>
-
-                {/* Selector táctil de Tamaño de porción del platillo */}
-                <div className="rounded-xl bg-white/85 border border-emerald-200/80 p-2.5 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
-                      <Scale className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      Tamaño de porción del platillo
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleApplyMealMultiplier(mealMultiplier - 0.25)}
-                        disabled={mealMultiplier <= 0.25}
-                        aria-label="Reducir porción del platillo"
-                        className="w-6 h-6 rounded-lg border border-emerald-200 bg-white text-emerald-800 disabled:opacity-40 flex items-center justify-center hover:bg-emerald-50"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="min-w-[2.75rem] text-center text-xs font-black text-emerald-900">
-                        {formatQuantityNumber(mealMultiplier)}x
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleApplyMealMultiplier(mealMultiplier + 0.25)}
-                        disabled={mealMultiplier >= 5}
-                        aria-label="Aumentar porción del platillo"
-                        className="w-6 h-6 rounded-lg border border-emerald-200 bg-white text-emerald-800 disabled:opacity-40 flex items-center justify-center hover:bg-emerald-50"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MEAL_MULTIPLIER_CHIPS.map((chip) => {
-                      const active = Math.abs(mealMultiplier - chip.value) < 0.01;
-                      return (
-                        <button
-                          key={chip.value}
-                          type="button"
-                          onClick={() => handleApplyMealMultiplier(chip.value)}
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold border transition ${
-                            active
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                              : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
-                          }`}
-                        >
-                          {chip.label}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
 
                 {analysis.items.length === 0 ? (
@@ -1563,30 +1439,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                                 </span>
                               )}
                             </div>
-
-                            {/* Chips rápidos cuando la unidad es contable */}
-                            {base.parsedPortion.unitKind === 'countable' && (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {ITEM_QUICK_QUANTITIES.map((q) => {
-                                  const active =
-                                    Math.abs(currentParsed.quantity - q.value) < 0.01;
-                                  return (
-                                    <button
-                                      key={q.label}
-                                      type="button"
-                                      onClick={() => handleSetItemQuantity(idx, q.value)}
-                                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
-                                        active
-                                          ? 'bg-emerald-600 text-white border-emerald-600'
-                                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
-                                      }`}
-                                    >
-                                      {q.label}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </div>
                         )}
 

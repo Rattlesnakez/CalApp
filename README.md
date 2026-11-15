@@ -13,7 +13,7 @@ Aplicación web progresiva (**PWA**) optimizada para teléfono móvil en españo
 - **Modo Demo y cálculo manual automático:** Funciona incluso sin API Key gracias al Modo Demo editable y al motor nutricional local en español (`FOOD_DICTIONARY`) para entradas escritas a mano.
 - **Guía integrada de API Key:** Tutorial paso a paso dentro de la app para obtener una API Key gratuita en Google AI Studio (`aistudio.google.com/apikey`).
 - **Cálculo personal de calorías y macros:** Calcula tu tasa metabólica basal (Mifflin-St Jeor), gasto diario (TDEE), IMC, meta calórica según objetivo (*Perder grasa*, *Mantener peso* o *Ganar músculo*) y macros recomendados.
-- **Desayuno, Comida y Cena editables con ajuste rápido de porciones:** Organización diaria por tiempo de comida con desglose frente a la meta sugerida, multiplicador rápido de platillo (`0.5x` a `2x`), controles `-`/`+` por ingrediente con recálculo automático de calorías y macros, edición completa de platillos guardados y confirmación visual antes de eliminar.
+- **Desayuno, Comida y Cena editables con ajuste rápido de porciones:** Organización diaria por tiempo de comida con desglose frente a la meta sugerida, controles `-`/`+` y edición directa de porción por ingrediente con recálculo automático de calorías y macros, edición completa de platillos guardados y confirmación visual antes de eliminar.
 - **Veredicto diario e historial:** Indica automáticamente si **Cumplió** (`90%–105%`), **No cumplió** (`< 90%`) o **Excedió** (`> 105%`) tus calorías requeridas y guarda el historial de los últimos 7 días en el dispositivo (`localStorage`).
 
 ---

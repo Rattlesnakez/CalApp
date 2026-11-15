@@ -3,7 +3,6 @@ import type {
   DailyEvaluation,
   DetectedFoodItem,
   GoalType,
-  MealAnalysisResult,
   MealCategory,
   UserProfile,
 } from '../types';
@@ -618,55 +617,6 @@ export function scaleFoodItemByQuantity(
     protein: Math.max(0, Math.round(base.proteinPerUnit * effectiveQty)),
     carbs: Math.max(0, Math.round(base.carbsPerUnit * effectiveQty)),
     fat: Math.max(0, Math.round(base.fatPerUnit * effectiveQty)),
-  };
-}
-
-export function scaleAnalysisByMultiplier(
-  baseAnalysis: MealAnalysisResult,
-  multiplier: number
-): MealAnalysisResult {
-  const safeMultiplier = Math.max(0.25, multiplier);
-
-  if (Math.abs(safeMultiplier - 1) < 0.001) {
-    return {
-      ...baseAnalysis,
-      items: baseAnalysis.items.map((it) => ({ ...it })),
-    };
-  }
-
-  if (baseAnalysis.items.length === 0) {
-    return {
-      ...baseAnalysis,
-      items: [],
-      totalCalories: Math.max(0, Math.round(baseAnalysis.totalCalories * safeMultiplier)),
-      protein: Math.max(0, Math.round(baseAnalysis.protein * safeMultiplier)),
-      carbs: Math.max(0, Math.round(baseAnalysis.carbs * safeMultiplier)),
-      fat: Math.max(0, Math.round(baseAnalysis.fat * safeMultiplier)),
-    };
-  }
-
-  const scaledItems = baseAnalysis.items.map((item) => {
-    const base = extractItemPortionBase(item);
-    return scaleFoodItemByQuantity(base, item, base.baseQuantity * safeMultiplier);
-  });
-
-  const totals = scaledItems.reduce(
-    (acc, item) => ({
-      totalCalories: acc.totalCalories + item.calories,
-      protein: acc.protein + item.protein,
-      carbs: acc.carbs + item.carbs,
-      fat: acc.fat + item.fat,
-    }),
-    { totalCalories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-  return {
-    ...baseAnalysis,
-    totalCalories: Math.round(totals.totalCalories),
-    protein: Math.round(totals.protein),
-    carbs: Math.round(totals.carbs),
-    fat: Math.round(totals.fat),
-    items: scaledItems,
   };
 }
 
