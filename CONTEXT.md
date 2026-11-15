@@ -12,8 +12,9 @@ Documento de contexto técnico y funcional de **CalApp IA**, una aplicación web
   1. Calcular las calorías y macronutrientes diarios requeridos a partir de los datos personales del usuario y su objetivo.
   2. Registrar alimentos en tres tiempos de comida: **Desayuno**, **Comida** y **Cena**.
   3. Detectar calorías y macros por **fotografía** (usando cámara integrada en la app o galería con Gemini Vision, más un Modo Demo sin costo) y mediante **entrada manual en texto** con estimación automática.
-  4. Mostrar un **veredicto diario** claro indicando si el usuario **Cumplió**, **No cumplió** o **Excedió** sus calorías necesarias, junto con un historial semanal de 7 días.
-  5. Guardar todo localmente en el dispositivo (`localStorage`) sin requerir backend ni cuentas externas.
+  4. Recomendar platillos con IA desde la pestaña **Platillos** (según calorías/macros restantes del día o según ingredientes disponibles en casa) con registro directo en 1 toque.
+  5. Mostrar un **veredicto diario** claro indicando si el usuario **Cumplió**, **No cumplió** o **Excedió** sus calorías necesarias, junto con un historial semanal de 7 días.
+  6. Guardar todo localmente en el dispositivo (`localStorage`) sin requerir backend ni cuentas externas.
 
 ---
 
@@ -121,6 +122,21 @@ Evalúa las calorías consumidas frente a `targetCalories`:
 - Si el navegador bloquea permisos o no soporta `getUserMedia`, muestra el botón de respaldo conectado al input nativo `<input type="file" accept="image/*" capture="environment">`.
 - Subir fotos desde galería usa `compressImageToDataUrl` (máximo `800px` de ancho, JPEG `0.78`).
 
+### Recomendación de Platillos con IA (`src/components/MealSuggestionsView.tsx` y `src/services/geminiService.ts`)
+- **Tipos en `src/types.ts`:** `AppTab` (`'hoy' | 'platillos' | 'historial' | 'perfil'`), `SuggestionMode` (`'goal' | 'pantry'`), `PantryCategoryFilter` (`'any' | MealCategory`), `SuggestedMeal` y `MealSuggestionRequest`.
+- **Modo `"Para mi meta de hoy"` (`goal`):**
+  - Calcula en tiempo real `remainingCalories` (`targetCalories - consumed.calories`) y `remainingMacros` (proteína, carbos y grasas restantes del día seleccionado).
+  - Detecta automáticamente el tiempo de comida según la hora del dispositivo (`<12` Desayuno, `12–17` Comida, `>=18` Cena) y permite cambiar entre `Desayuno`, `Comida` y `Cena` o generar nuevas opciones.
+  - Adapta porciones y selección al objetivo del usuario (`lose`, `maintain`, `gain`).
+- **Modo `"Con lo que tengo"` (`pantry`):**
+  - Input de ingredientes con soporte de comas, tecla `Enter` / botón `+`, chips removibles, botón `Limpiar` y etiquetas rápidas (`QUICK_INGREDIENTS`: Huevo, Pollo, Atún, Arroz, Aguacate, Avena, Tortillas, Queso panela).
+  - Incluye filtro opcional de tiempo de comida (`Cualquiera`, `Desayuno`, `Comida`, `Cena`) y toggle `adjustToRemainingCalories` para escalar porciones al presupuesto calórico restante.
+  - Destaca en cada tarjeta los ingredientes aprovechados (`matchedIngredients`) y los básicos extra sugeridos (`extraIngredients`).
+- **Generación IA y respaldo sin API Key:**
+  - `generateMealSuggestions` llama a `gemini-4-hydrogen` (`apiVersion: 'v1beta'` / `api_version: 'v1beta'`) con `mealSuggestionsJsonSchema`.
+  - Si no existe `calapp_gemini_api_key` o falla la red, usa `suggestMealsLocally`: filtra y escala `LOCAL_SUGGESTED_MEALS` y, cuando faltan coincidencias en modo `pantry`, construye combinaciones dinámicas con `buildDynamicPantryMeal` apoyándose en `estimateSingleIngredientLocally`.
+- **Registro directo:** El botón `+ Registrar en [Desayuno/Comida/Cena]` convierte la sugerencia mediante `buildItemsFromSuggestion` en un `MealEntry` completo y lo guarda vía `onSaveMeal` en el estado global y en `localStorage` (`calapp_meal_entries_v1`).
+
 ### Almacenamiento local (`src/utils/storage.ts`)
 - Claves en `localStorage`:
   - `calapp_user_profile_v1`: perfil `UserProfile` (`onboardingCompleted: false` por defecto).
@@ -149,3 +165,20 @@ npm run preview  # Vista previa local del build de producción
 
 - **Despliegue continuo:** El workflow `.github/workflows/deploy.yml` se ejecuta automáticamente en cada push a `main`, corre `npm ci` + `npm run build` con Node `22` y publica el contenido de `dist/` en la rama `gh-pages`.
 - **Nota operativa:** Evitar hacer `git push` manual directo a `gh-pages` inmediatamente después de empujar a `main`, ya que `deploy.yml` ya publica en `gh-pages` y dos ejecuciones simultáneas pueden quedar en cola en GitHub Pages.
+
+---
+
+## 8. Historial de Cambios Recientes (Changelog)
+
+> **Regla de mantenimiento:** Actualizar `CONTEXT.md` (y `README.md` si cambian funcionalidades visibles) después de cada cambio relevante en la aplicación.
+
+- **`18da971` — Pestaña `Platillos` (Recomendación de Platillos con IA):** Se añadió `MealSuggestionsView.tsx`, barra inferior de 5 botones (`Hoy`, `Platillos`, `Foto IA`, `Historial`, `Mi Perfil`), modos *"Para mi meta de hoy"* y *"Con lo que tengo"*, `generateMealSuggestions` (`gemini-4-hydrogen`, `v1beta`) y respaldo local `suggestMealsLocally`.
+- **`ee230cc` — Documentación inicial:** Se crearon `CONTEXT.md` y `README.md` en la raíz del proyecto.
+- **`adc0814` — Simplificación visual:** Se redujo la saturación en `DailyDashboardView.tsx`, `PhotoScannerModal.tsx` y `OnboardingOrProfileView.tsx` (header + fecha en 1 fila, tarjeta unificada, eliminación de botones duplicados y de la cuadrícula demo del modal).
+- **`e857209` — Cámara integrada en vivo:** Se integró WebRTC (`getUserMedia` + `<canvas>`) dentro de `PhotoScannerModal.tsx` con cambio de cámara frontal/trasera y respaldo nativo.
+- **`82fe2a3` — Onboarding limpio:** Se ocultó la tarjeta de cálculo calórico durante el registro inicial y se hicieron requeridos edad, peso y altura.
+- **`7c0562e` — Placeholders e inputs numéricos:** Los campos iniciales arrancan vacíos con `placeholder` y los inputs numéricos permiten borrar todo sin dejar un `0` bloqueado.
+- **`7c535d9` — Fix Gemini Vision `v1beta`:** Se fijó `apiVersion: 'v1beta'` y `api_version: 'v1beta'` en `geminiService.ts` para evitar el error `400` al enviar imágenes.
+- **`255f9aa` — Safe area iOS:** Se agregó `.pt-safe` en `index.css` para evitar el solapamiento de la barra de estado de iPhone.
+- **`e5434c5` — Tutorial API Key y entrada manual automática:** Se añadió `ApiKeyTutorialBox.tsx` y cálculo automático de comidas escritas manualmente (`FOOD_DICTIONARY` + Gemini).
+- **`8bc94f7` — Lanzamiento inicial:** Base PWA de CalApp IA con Desayuno/Comida/Cena, Mifflin-St Jeor, veredicto diario e historial de 7 días.
