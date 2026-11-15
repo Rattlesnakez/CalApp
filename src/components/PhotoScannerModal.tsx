@@ -3,12 +3,16 @@ import {
   ArrowLeft,
   Camera,
   Check,
+  ChevronDown,
+  ChevronUp,
   Edit3,
   HelpCircle,
   ImagePlus,
   Loader2,
+  Minus,
   Plus,
   RefreshCw,
+  Scale,
   Sparkles,
   Trash2,
   X,
@@ -19,7 +23,15 @@ import type {
   MealCategory,
   MealEntry,
 } from '../types';
-import { MEAL_CATEGORY_META } from '../utils/nutrition';
+import {
+  type ItemPortionBase,
+  MEAL_CATEGORY_META,
+  extractItemPortionBase,
+  formatQuantityNumber,
+  parsePortionText,
+  scaleAnalysisByMultiplier,
+  scaleFoodItemByQuantity,
+} from '../utils/nutrition';
 import {
   DEMO_MEAL_TEMPLATES,
   analyzeFoodDescription,
@@ -58,6 +70,21 @@ const MANUAL_EXAMPLES: Record<MealCategory, string[]> = {
   ],
 };
 
+const MEAL_MULTIPLIER_CHIPS: Array<{ value: number; label: string }> = [
+  { value: 0.5, label: '0.5x Media' },
+  { value: 0.75, label: '0.75x' },
+  { value: 1, label: '1x Normal' },
+  { value: 1.5, label: '1.5x' },
+  { value: 2, label: '2x Doble' },
+];
+
+const ITEM_QUICK_QUANTITIES: Array<{ value: number; label: string }> = [
+  { value: 0.5, label: '½' },
+  { value: 1, label: '1' },
+  { value: 1.5, label: '1.5' },
+  { value: 2, label: '2' },
+];
+
 export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   isOpen,
   initialCategory,
@@ -71,7 +98,10 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   const [category, setCategory] = useState<MealCategory>(initialCategory);
   const [step, setStep] = useState<ModalStep>('choose');
   const [photoPreview, setPhotoPreview] = useState<string | undefined>(undefined);
+  const [baseAnalysis, setBaseAnalysis] = useState<MealAnalysisResult | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
+  const [mealMultiplier, setMealMultiplier] = useState<number>(1);
+  const [itemBases, setItemBases] = useState<ItemPortionBase[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [manualText, setManualText] = useState<string>('');
   const [analyzingLabel, setAnalyzingLabel] = useState<string>(
@@ -79,6 +109,10 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   );
   const [showDemoTutorial, setShowDemoTutorial] = useState<boolean>(false);
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
+  const [expandedMacros, setExpandedMacros] = useState<Record<number, boolean>>({});
+  const [editingPortionTextIdx, setEditingPortionTextIdx] = useState<number | null>(null);
+  const [portionTextDraft, setPortionTextDraft] = useState<string>('');
+  const [reestimatingIdx, setReestimatingIdx] = useState<number | null>(null);
 
   // Campos para agregar un alimento extra en revisión o entrada manual
   const [newItemName, setNewItemName] = useState('');
@@ -110,6 +144,26 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     setIsCameraReady(false);
   }, []);
 
+  const initializeReviewState = useCallback((result: MealAnalysisResult) => {
+    const clonedBase: MealAnalysisResult = {
+      ...result,
+      items: result.items.map((it) => ({ ...it })),
+    };
+    setBaseAnalysis(clonedBase);
+    setAnalysis({
+      ...clonedBase,
+      items: clonedBase.items.map((it) => ({ ...it })),
+    });
+    setMealMultiplier(1);
+    setItemBases(clonedBase.items.map(extractItemPortionBase));
+    setItemDrafts({});
+    setExpandedMacros({});
+    setEditingPortionTextIdx(null);
+    setPortionTextDraft('');
+    setReestimatingIdx(null);
+    setStep('review');
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       stopCameraStream();
@@ -122,7 +176,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       stopCameraStream();
       setCategory(editingEntry.category);
       setPhotoPreview(editingEntry.photoDataUrl);
-      setAnalysis({
+      initializeReviewState({
         mealName: editingEntry.mealName,
         totalCalories: editingEntry.totalCalories,
         protein: editingEntry.protein,
@@ -132,15 +186,20 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         aiTip: editingEntry.aiTip,
         isDemo: editingEntry.isDemo,
       });
-      setStep('review');
     } else {
       setCategory(initialCategory);
       setPhotoPreview(undefined);
+      setBaseAnalysis(null);
       setAnalysis(null);
+      setMealMultiplier(1);
+      setItemBases([]);
+      setExpandedMacros({});
+      setEditingPortionTextIdx(null);
+      setPortionTextDraft('');
       setManualText('');
       setStep('choose');
     }
-  }, [isOpen, editingEntry, initialCategory, stopCameraStream]);
+  }, [isOpen, editingEntry, initialCategory, stopCameraStream, initializeReviewState]);
 
   useEffect(() => {
     return () => {
@@ -171,7 +230,14 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     stopCameraStream();
     setStep('choose');
     setPhotoPreview(undefined);
+    setBaseAnalysis(null);
     setAnalysis(null);
+    setMealMultiplier(1);
+    setItemBases([]);
+    setExpandedMacros({});
+    setEditingPortionTextIdx(null);
+    setPortionTextDraft('');
+    setReestimatingIdx(null);
     setErrorMsg('');
     setShowAddItemForm(false);
     setShowNativeFallback(false);
@@ -280,8 +346,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         category,
       });
 
-      setAnalysis(result);
-      setStep('review');
+      initializeReviewState(result);
     } catch (err) {
       const message =
         err instanceof Error
@@ -313,8 +378,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         category,
       });
 
-      setAnalysis(result);
-      setStep('review');
+      initializeReviewState(result);
     } catch (err) {
       const message =
         err instanceof Error
@@ -343,8 +407,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         forceDemo: true,
         demoTemplateId: template.id,
       });
-      setAnalysis(result);
-      setStep('review');
+      initializeReviewState(result);
     } catch {
       setErrorMsg('No se pudo cargar la simulación.');
       setStep('choose');
@@ -374,8 +437,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
         description: manualText,
         category,
       });
-      setAnalysis(result);
-      setStep('review');
+      initializeReviewState(result);
     } catch (err) {
       const message =
         err instanceof Error
@@ -390,7 +452,181 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
     key in itemDrafts ? itemDrafts[key] : String(numericValue);
 
   const parseNumericInput = (raw: string): number =>
-    raw.trim() === '' ? 0 : Math.max(0, Math.round(Number(raw) || 0));
+    raw.trim() === ''
+      ? 0
+      : Math.max(0, Math.round(Number(raw.replace(',', '.')) || 0));
+
+  const parseDecimalInput = (raw: string): number => {
+    if (raw.trim() === '') return 0;
+    const parsed = Number(raw.replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  };
+
+  const syncCustomBase = (nextAnalysis: MealAnalysisResult) => {
+    setBaseAnalysis({
+      ...nextAnalysis,
+      items: nextAnalysis.items.map((it) => ({ ...it })),
+    });
+    if (mealMultiplier !== 1) {
+      setMealMultiplier(1);
+    }
+  };
+
+  const handleApplyMealMultiplier = (rawMultiplier: number) => {
+    if (!baseAnalysis) return;
+    const clamped = Math.min(5, Math.max(0.25, Number(rawMultiplier.toFixed(2))));
+    const scaled = scaleAnalysisByMultiplier(baseAnalysis, clamped);
+    setMealMultiplier(clamped);
+    setAnalysis(scaled);
+    setItemDrafts({});
+    setEditingPortionTextIdx(null);
+  };
+
+  const applyItemQuantityChange = (
+    index: number,
+    newQty: number,
+    draftQtyOverride?: string
+  ) => {
+    if (!analysis) return;
+    const targetItem = analysis.items[index];
+    if (!targetItem) return;
+
+    const base = itemBases[index] ?? extractItemPortionBase(targetItem);
+    const updatedItem = scaleFoodItemByQuantity(base, targetItem, newQty);
+    const nextItems = analysis.items.map((item, idx) =>
+      idx === index ? updatedItem : item
+    );
+    const totals = recalculateTotalsFromItems(nextItems);
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      items: nextItems,
+      ...totals,
+    };
+
+    setAnalysis(nextAnalysis);
+    setItemDrafts((prev) => {
+      const next = { ...prev };
+      delete next[`${index}_calories`];
+      delete next[`${index}_protein`];
+      delete next[`${index}_carbs`];
+      delete next[`${index}_fat`];
+      if (draftQtyOverride !== undefined) {
+        next[`${index}_qty`] = draftQtyOverride;
+      } else {
+        delete next[`${index}_qty`];
+      }
+      return next;
+    });
+    syncCustomBase(nextAnalysis);
+  };
+
+  const handleStepItemQuantity = (index: number, delta: number) => {
+    if (!analysis) return;
+    const item = analysis.items[index];
+    if (!item) return;
+
+    const base = itemBases[index] ?? extractItemPortionBase(item);
+    const currentQty = parsePortionText(item.portion).quantity;
+    const nextQty = Math.max(
+      base.parsedPortion.minQuantity,
+      Number((currentQty + delta).toFixed(2))
+    );
+
+    applyItemQuantityChange(index, nextQty);
+  };
+
+  const handleSetItemQuantity = (index: number, nextQty: number) => {
+    applyItemQuantityChange(index, nextQty);
+  };
+
+  const handleUpdateItemQuantityInput = (index: number, rawValue: string) => {
+    const parsedQty = parseDecimalInput(rawValue);
+    applyItemQuantityChange(index, parsedQty, rawValue);
+  };
+
+  const handleStartEditPortionText = (index: number) => {
+    if (!analysis || !analysis.items[index]) return;
+    setEditingPortionTextIdx(index);
+    setPortionTextDraft(analysis.items[index].portion);
+  };
+
+  const handleCancelPortionTextEdit = () => {
+    setEditingPortionTextIdx(null);
+    setPortionTextDraft('');
+  };
+
+  const handleCommitPortionTextEdit = async (index: number) => {
+    if (!analysis || editingPortionTextIdx !== index) return;
+    const targetItem = analysis.items[index];
+    if (!targetItem) {
+      handleCancelPortionTextEdit();
+      return;
+    }
+
+    const nextPortionText = portionTextDraft.trim();
+    if (!nextPortionText || nextPortionText === targetItem.portion) {
+      handleCancelPortionTextEdit();
+      return;
+    }
+
+    const oldParsed = parsePortionText(targetItem.portion);
+    const newParsed = parsePortionText(nextPortionText);
+
+    // Si mantiene la misma unidad, escala proporcionalmente al instante
+    if (
+      oldParsed.unit.toLowerCase() === newParsed.unit.toLowerCase() &&
+      oldParsed.unitKind === newParsed.unitKind
+    ) {
+      handleCancelPortionTextEdit();
+      applyItemQuantityChange(index, newParsed.quantity);
+      return;
+    }
+
+    // Si cambió la unidad completa (ej. "1 pieza" -> "120 g"), recalcular con estimateSingleFoodItem
+    setReestimatingIdx(index);
+    try {
+      const estimated = await estimateSingleFoodItem(
+        targetItem.name,
+        nextPortionText
+      );
+      const updatedItem: DetectedFoodItem = {
+        ...estimated,
+        name: targetItem.name || estimated.name,
+        portion: nextPortionText,
+      };
+      const nextItems = analysis.items.map((it, idx) =>
+        idx === index ? updatedItem : it
+      );
+      const totals = recalculateTotalsFromItems(nextItems);
+      const nextAnalysis: MealAnalysisResult = {
+        ...analysis,
+        items: nextItems,
+        ...totals,
+      };
+      const nextBases = nextItems.map((it, idx) =>
+        idx === index
+          ? extractItemPortionBase(updatedItem)
+          : itemBases[idx] ?? extractItemPortionBase(it)
+      );
+
+      setItemBases(nextBases);
+      setAnalysis(nextAnalysis);
+      setItemDrafts((prev) => {
+        const next = { ...prev };
+        delete next[`${index}_qty`];
+        delete next[`${index}_calories`];
+        delete next[`${index}_protein`];
+        delete next[`${index}_carbs`];
+        delete next[`${index}_fat`];
+        return next;
+      });
+      syncCustomBase(nextAnalysis);
+    } finally {
+      setReestimatingIdx(null);
+      setEditingPortionTextIdx(null);
+      setPortionTextDraft('');
+    }
+  };
 
   const handleUpdateItemCalories = (index: number, rawValue: string) => {
     if (!analysis) return;
@@ -400,7 +636,21 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       idx === index ? { ...item, calories: safeCal } : item
     );
     const totals = recalculateTotalsFromItems(nextItems);
-    setAnalysis({ ...analysis, items: nextItems, ...totals });
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      items: nextItems,
+      ...totals,
+    };
+
+    setAnalysis(nextAnalysis);
+    setItemBases((prev) =>
+      nextItems.map((it, idx) =>
+        idx === index
+          ? extractItemPortionBase(it)
+          : prev[idx] ?? extractItemPortionBase(it)
+      )
+    );
+    syncCustomBase(nextAnalysis);
   };
 
   const handleUpdateItemMacro = (
@@ -415,19 +665,45 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
       idx === index ? { ...item, [field]: safeVal } : item
     );
     const totals = recalculateTotalsFromItems(nextItems);
-    setAnalysis({ ...analysis, items: nextItems, ...totals });
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      items: nextItems,
+      ...totals,
+    };
+
+    setAnalysis(nextAnalysis);
+    setItemBases((prev) =>
+      nextItems.map((it, idx) =>
+        idx === index
+          ? extractItemPortionBase(it)
+          : prev[idx] ?? extractItemPortionBase(it)
+      )
+    );
+    syncCustomBase(nextAnalysis);
   };
 
-  const handleUpdateItemText = (
-    index: number,
-    field: 'name' | 'portion',
-    value: string
-  ) => {
+  const handleUpdateItemName = (index: number, value: string) => {
     if (!analysis) return;
     const nextItems = analysis.items.map((item, idx) =>
-      idx === index ? { ...item, [field]: value } : item
+      idx === index ? { ...item, name: value } : item
     );
     setAnalysis({ ...analysis, items: nextItems });
+    if (baseAnalysis) {
+      setBaseAnalysis({
+        ...baseAnalysis,
+        items: baseAnalysis.items.map((item, idx) =>
+          idx === index ? { ...item, name: value } : item
+        ),
+      });
+    }
+  };
+
+  const handleUpdateMealName = (value: string) => {
+    if (!analysis) return;
+    setAnalysis({ ...analysis, mealName: value });
+    if (baseAnalysis) {
+      setBaseAnalysis({ ...baseAnalysis, mealName: value });
+    }
   };
 
   const handleUpdateDirectTotal = (
@@ -436,21 +712,37 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   ) => {
     if (!analysis) return;
     setItemDrafts((prev) => ({ ...prev, [`total_${field}`]: rawValue }));
-    setAnalysis({ ...analysis, [field]: parseNumericInput(rawValue) });
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      [field]: parseNumericInput(rawValue),
+    };
+    setAnalysis(nextAnalysis);
+    syncCustomBase(nextAnalysis);
   };
 
   const handleDeleteItem = (index: number) => {
     if (!analysis) return;
     const nextItems = analysis.items.filter((_, idx) => idx !== index);
     const totals = recalculateTotalsFromItems(nextItems);
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      items: nextItems,
+      ...totals,
+    };
     setItemDrafts({});
-    setAnalysis({ ...analysis, items: nextItems, ...totals });
+    setExpandedMacros({});
+    setEditingPortionTextIdx(null);
+    setItemBases(nextItems.map(extractItemPortionBase));
+    setAnalysis(nextAnalysis);
+    syncCustomBase(nextAnalysis);
   };
 
   const handleAddExtraItem = async () => {
     if (!analysis || !newItemName.trim()) return;
     const rawCal = newItemCalories.trim();
-    const parsedCal = rawCal ? Math.max(0, Math.round(Number(rawCal) || 0)) : 0;
+    const parsedCal = rawCal
+      ? Math.max(0, Math.round(Number(rawCal.replace(',', '.')) || 0))
+      : 0;
 
     let added: DetectedFoodItem;
     if (parsedCal > 0) {
@@ -476,8 +768,15 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
 
     const nextItems = [...analysis.items, added];
     const totals = recalculateTotalsFromItems(nextItems);
+    const nextAnalysis: MealAnalysisResult = {
+      ...analysis,
+      items: nextItems,
+      ...totals,
+    };
     setItemDrafts({});
-    setAnalysis({ ...analysis, items: nextItems, ...totals });
+    setItemBases((prev) => [...prev, extractItemPortionBase(added)]);
+    setAnalysis(nextAnalysis);
+    syncCustomBase(nextAnalysis);
     setNewItemName('');
     setNewItemPortion('1 porción');
     setNewItemCalories('');
@@ -874,20 +1173,72 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                 </div>
               )}
 
-              {/* Nombre del platillo + resumen */}
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-2.5">
-                <label className="block text-[11px] font-bold text-emerald-800 uppercase">
-                  Nombre del platillo
-                </label>
-                <input
-                  type="text"
-                  value={analysis.mealName}
-                  onChange={(e) =>
-                    setAnalysis({ ...analysis, mealName: e.target.value })
-                  }
-                  placeholder="Ej. Chilaquiles verdes con pollo"
-                  className="w-full rounded-xl bg-white border border-emerald-200 px-3 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
-                />
+              {/* Nombre del platillo + multiplicador de porción + resumen */}
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-800 uppercase mb-1">
+                    Nombre del platillo
+                  </label>
+                  <input
+                    type="text"
+                    value={analysis.mealName}
+                    onChange={(e) => handleUpdateMealName(e.target.value)}
+                    placeholder="Ej. Chilaquiles verdes con pollo"
+                    className="w-full rounded-xl bg-white border border-emerald-200 px-3 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                  />
+                </div>
+
+                {/* Selector táctil de Tamaño de porción del platillo */}
+                <div className="rounded-xl bg-white/85 border border-emerald-200/80 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
+                      <Scale className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      Tamaño de porción del platillo
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyMealMultiplier(mealMultiplier - 0.25)}
+                        disabled={mealMultiplier <= 0.25}
+                        aria-label="Reducir porción del platillo"
+                        className="w-6 h-6 rounded-lg border border-emerald-200 bg-white text-emerald-800 disabled:opacity-40 flex items-center justify-center hover:bg-emerald-50"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="min-w-[2.75rem] text-center text-xs font-black text-emerald-900">
+                        {formatQuantityNumber(mealMultiplier)}x
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyMealMultiplier(mealMultiplier + 0.25)}
+                        disabled={mealMultiplier >= 5}
+                        aria-label="Aumentar porción del platillo"
+                        className="w-6 h-6 rounded-lg border border-emerald-200 bg-white text-emerald-800 disabled:opacity-40 flex items-center justify-center hover:bg-emerald-50"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MEAL_MULTIPLIER_CHIPS.map((chip) => {
+                      const active = Math.abs(mealMultiplier - chip.value) < 0.01;
+                      return (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          onClick={() => handleApplyMealMultiplier(chip.value)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold border transition ${
+                            active
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {analysis.items.length === 0 ? (
                   <div className="space-y-2 pt-1">
@@ -898,7 +1249,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
-                          inputMode="numeric"
+                          inputMode="decimal"
+                          step="any"
                           min={0}
                           value={getDraftValue('total_totalCalories', analysis.totalCalories)}
                           onChange={(e) =>
@@ -918,7 +1270,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         </span>
                         <input
                           type="number"
-                          inputMode="numeric"
+                          inputMode="decimal"
+                          step="any"
                           min={0}
                           value={getDraftValue('total_protein', analysis.protein)}
                           onChange={(e) =>
@@ -934,7 +1287,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         </span>
                         <input
                           type="number"
-                          inputMode="numeric"
+                          inputMode="decimal"
+                          step="any"
                           min={0}
                           value={getDraftValue('total_carbs', analysis.carbs)}
                           onChange={(e) =>
@@ -950,7 +1304,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                         </span>
                         <input
                           type="number"
-                          inputMode="numeric"
+                          inputMode="decimal"
+                          step="any"
                           min={0}
                           value={getDraftValue('total_fat', analysis.fat)}
                           onChange={(e) =>
@@ -963,7 +1318,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center justify-between pt-0.5">
                     <div>
                       <span className="text-xs text-emerald-800 font-semibold">
                         {isEditing ? 'Total del platillo' : 'Total detectado'}
@@ -988,7 +1343,7 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
               )}
 
               {/* Lista de ingredientes editables */}
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     {isEditing ? 'Ingredientes / alimentos' : 'Alimentos detectados'} ({analysis.items.length})
@@ -1015,7 +1370,8 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                       />
                       <input
                         type="number"
-                        inputMode="numeric"
+                        inputMode="decimal"
+                        step="any"
                         min={0}
                         placeholder="Kcal (opcional: auto)"
                         value={newItemCalories}
@@ -1056,117 +1412,276 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
                     No hay ingredientes individuales. Puedes editar los totales arriba o añadir un ingrediente.
                   </p>
                 ) : (
-                  analysis.items.map((item, idx) => (
-                    <div
-                      key={`item_${idx}`}
-                      className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2"
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0 space-y-1">
+                  analysis.items.map((item, idx) => {
+                    const base = itemBases[idx] ?? extractItemPortionBase(item);
+                    const currentParsed = parsePortionText(item.portion);
+                    const isMacrosOpen = Boolean(expandedMacros[idx]);
+                    const isEditingUnit = editingPortionTextIdx === idx;
+                    const isReestimating = reestimatingIdx === idx;
+
+                    return (
+                      <div
+                        key={`item_${idx}`}
+                        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5"
+                      >
+                        {/* Fila 1: Nombre del alimento + calorías resultantes + eliminar */}
+                        <div className="flex items-center gap-2">
                           <input
                             type="text"
                             value={item.name}
                             onChange={(e) =>
-                              handleUpdateItemText(idx, 'name', e.target.value)
+                              handleUpdateItemName(idx, e.target.value)
                             }
                             placeholder="Nombre del alimento"
-                            className="w-full text-xs font-bold text-slate-900 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
+                            className="flex-1 min-w-0 text-xs font-extrabold text-slate-900 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
                           />
-                          <input
-                            type="text"
-                            value={item.portion}
-                            onChange={(e) =>
-                              handleUpdateItemText(idx, 'portion', e.target.value)
-                            }
-                            placeholder="Porción (ej. 150g o 1 taza)"
-                            className="w-full text-[11px] text-slate-500 bg-transparent border-b border-transparent focus:border-emerald-400 focus:outline-none"
-                          />
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="any"
+                              min={0}
+                              value={getDraftValue(`${idx}_calories`, item.calories)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleUpdateItemCalories(idx, e.target.value)
+                              }
+                              aria-label={`Calorías de ${item.name || 'ingrediente'}`}
+                              className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-extrabold text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
+                            />
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              kcal
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(idx)}
+                              className="p-1 text-slate-400 hover:text-rose-600"
+                              aria-label="Quitar alimento"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            value={getDraftValue(`${idx}_calories`, item.calories)}
-                            placeholder="0"
-                            onChange={(e) =>
-                              handleUpdateItemCalories(idx, e.target.value)
-                            }
-                            aria-label={`Calorías de ${item.name || 'ingrediente'}`}
-                            className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
-                          />
-                          <span className="text-[11px] font-semibold text-slate-500">
-                            kcal
+
+                        {/* Fila 2: Control táctil de porción (- [cantidad unidad] +) */}
+                        {isEditingUnit ? (
+                          <div className="rounded-xl bg-slate-50 border border-slate-200 p-2 space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={portionTextDraft}
+                                onChange={(e) => setPortionTextDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    void handleCommitPortionTextEdit(idx);
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelPortionTextEdit();
+                                  }
+                                }}
+                                placeholder="Ej. 120 g, 1.5 tazas, 2 piezas"
+                                autoFocus
+                                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                disabled={isReestimating}
+                                onClick={() => void handleCommitPortionTextEdit(idx)}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-1.5 text-[11px] font-bold inline-flex items-center gap-1 shrink-0"
+                              >
+                                {isReestimating ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Check className="w-3 h-3" />
+                                )}
+                                Recalcular
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelPortionTextEdit}
+                                aria-label="Cancelar cambio de porción"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500">
+                              Cambia la unidad (ej. &quot;1 pieza&quot; a &quot;120 g&quot;) para recalcular calorías automáticamente.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-50 border border-slate-200 p-1">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleStepItemQuantity(idx, -base.parsedPortion.step)
+                                  }
+                                  aria-label={`Disminuir cantidad de ${item.name || 'ingrediente'}`}
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-center transition"
+                                >
+                                  <Minus className="w-3.5 h-3.5" />
+                                </button>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="any"
+                                  min={0}
+                                  value={getDraftValue(`${idx}_qty`, currentParsed.quantity)}
+                                  onChange={(e) =>
+                                    handleUpdateItemQuantityInput(idx, e.target.value)
+                                  }
+                                  aria-label={`Cantidad de ${item.name || 'ingrediente'}`}
+                                  className="w-12 rounded-lg bg-white border border-slate-200 px-1 py-1 text-xs font-extrabold text-center text-slate-900 focus:border-emerald-500 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditPortionText(idx)}
+                                  title="Toca para cambiar unidad o texto de porción"
+                                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-white hover:text-emerald-700 transition max-w-[8.5rem] truncate"
+                                >
+                                  <span className="truncate">{currentParsed.unit}</span>
+                                  <Edit3 className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleStepItemQuantity(idx, base.parsedPortion.step)
+                                  }
+                                  aria-label={`Aumentar cantidad de ${item.name || 'ingrediente'}`}
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-center transition"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {currentParsed.gramsInParens && (
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  ~{Math.round(currentParsed.gramsInParens)}{' '}
+                                  {currentParsed.gramsInParensUnit || 'g'}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Chips rápidos cuando la unidad es contable */}
+                            {base.parsedPortion.unitKind === 'countable' && (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {ITEM_QUICK_QUANTITIES.map((q) => {
+                                  const active =
+                                    Math.abs(currentParsed.quantity - q.value) < 0.01;
+                                  return (
+                                    <button
+                                      key={q.label}
+                                      type="button"
+                                      onClick={() => handleSetItemQuantity(idx, q.value)}
+                                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
+                                        active
+                                          ? 'bg-emerald-600 text-white border-emerald-600'
+                                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                                      }`}
+                                    >
+                                      {q.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Fila 3: Resumen limpio + desplegable de macros manuales */}
+                        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+                          <span className="text-[11px] font-medium text-slate-500">
+                            P: {item.protein}g • C: {item.carbs}g • G: {item.fat}g
                           </span>
                           <button
                             type="button"
-                            onClick={() => handleDeleteItem(idx)}
-                            className="p-1 text-slate-400 hover:text-rose-600"
-                            aria-label="Quitar alimento"
+                            onClick={() =>
+                              setExpandedMacros((prev) => ({
+                                ...prev,
+                                [idx]: !prev[idx],
+                              }))
+                            }
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 shrink-0"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <span>
+                              {isMacrosOpen
+                                ? 'Ocultar macros'
+                                : 'Ajustar macros manualmente'}
+                            </span>
+                            {isMacrosOpen ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
                           </button>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                          <span className="font-bold text-slate-500">P</span>
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={getDraftValue(`${idx}_protein`, item.protein)}
-                              placeholder="0"
-                              onChange={(e) =>
-                                handleUpdateItemMacro(idx, 'protein', e.target.value)
-                              }
-                              aria-label={`Proteína de ${item.name || 'ingrediente'}`}
-                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
-                            />
-                            <span className="text-slate-400">g</span>
+                        {isMacrosOpen && (
+                          <div className="grid grid-cols-3 gap-2 pt-1">
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500">P</span>
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="any"
+                                  min={0}
+                                  value={getDraftValue(`${idx}_protein`, item.protein)}
+                                  placeholder="0"
+                                  onChange={(e) =>
+                                    handleUpdateItemMacro(idx, 'protein', e.target.value)
+                                  }
+                                  aria-label={`Proteína de ${item.name || 'ingrediente'}`}
+                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                />
+                                <span className="text-slate-400">g</span>
+                              </div>
+                            </label>
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500">C</span>
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="any"
+                                  min={0}
+                                  value={getDraftValue(`${idx}_carbs`, item.carbs)}
+                                  placeholder="0"
+                                  onChange={(e) =>
+                                    handleUpdateItemMacro(idx, 'carbs', e.target.value)
+                                  }
+                                  aria-label={`Carbohidratos de ${item.name || 'ingrediente'}`}
+                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                />
+                                <span className="text-slate-400">g</span>
+                              </div>
+                            </label>
+                            <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+                              <span className="font-bold text-slate-500">G</span>
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="any"
+                                  min={0}
+                                  value={getDraftValue(`${idx}_fat`, item.fat)}
+                                  placeholder="0"
+                                  onChange={(e) =>
+                                    handleUpdateItemMacro(idx, 'fat', e.target.value)
+                                  }
+                                  aria-label={`Grasas de ${item.name || 'ingrediente'}`}
+                                  className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
+                                />
+                                <span className="text-slate-400">g</span>
+                              </div>
+                            </label>
                           </div>
-                        </label>
-                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                          <span className="font-bold text-slate-500">C</span>
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={getDraftValue(`${idx}_carbs`, item.carbs)}
-                              placeholder="0"
-                              onChange={(e) =>
-                                handleUpdateItemMacro(idx, 'carbs', e.target.value)
-                              }
-                              aria-label={`Carbohidratos de ${item.name || 'ingrediente'}`}
-                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
-                            />
-                            <span className="text-slate-400">g</span>
-                          </div>
-                        </label>
-                        <label className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
-                          <span className="font-bold text-slate-500">G</span>
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={getDraftValue(`${idx}_fat`, item.fat)}
-                              placeholder="0"
-                              onChange={(e) =>
-                                handleUpdateItemMacro(idx, 'fat', e.target.value)
-                              }
-                              aria-label={`Grasas de ${item.name || 'ingrediente'}`}
-                              className="w-10 text-right font-bold text-slate-800 bg-transparent focus:outline-none"
-                            />
-                            <span className="text-slate-400">g</span>
-                          </div>
-                        </label>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 

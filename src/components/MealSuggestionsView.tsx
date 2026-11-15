@@ -26,6 +26,8 @@ import {
   calculateCalorieTarget,
   calculateMacroTargets,
   formatDateLabel,
+  scaleIngredientLine,
+  splitIngredientLineToPortionAndName,
 } from '../utils/nutrition';
 import { generateMealSuggestions } from '../services/geminiService';
 
@@ -48,6 +50,8 @@ const QUICK_INGREDIENTS = [
   'Queso panela',
 ];
 
+const SUGGESTION_PORTION_OPTIONS = [0.5, 1, 1.5] as const;
+
 function getDefaultCategoryByHour(): MealCategory {
   const hour = new Date().getHours();
   if (hour < 12) return 'desayuno';
@@ -62,20 +66,62 @@ function parseIngredientTokens(rawText: string): string[] {
     .filter((part) => part.length > 0);
 }
 
-function buildItemsFromSuggestion(meal: SuggestedMeal): DetectedFoodItem[] {
-  const list = meal.ingredients.length > 0 ? meal.ingredients : [meal.mealName];
-  const count = list.length;
-  const baseCal = Math.floor(meal.totalCalories / count);
-  const remainderCal = meal.totalCalories - baseCal * count;
+function getScaledSuggestionNutrition(
+  meal: SuggestedMeal,
+  multiplier: number
+): {
+  totalCalories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: string[];
+} {
+  return {
+    totalCalories: Math.max(0, Math.round(meal.totalCalories * multiplier)),
+    protein: Math.max(0, Math.round(meal.protein * multiplier)),
+    carbs: Math.max(0, Math.round(meal.carbs * multiplier)),
+    fat: Math.max(0, Math.round(meal.fat * multiplier)),
+    ingredients: meal.ingredients.map((ing) => scaleIngredientLine(ing, multiplier)),
+  };
+}
 
-  return list.map((ing, idx) => ({
-    name: ing,
-    portion: '1 porción',
-    calories: idx === 0 ? baseCal + remainderCal : baseCal,
-    protein: idx === 0 ? Math.max(0, meal.protein - Math.floor(meal.protein / count) * (count - 1)) : Math.floor(meal.protein / count),
-    carbs: idx === 0 ? Math.max(0, meal.carbs - Math.floor(meal.carbs / count) * (count - 1)) : Math.floor(meal.carbs / count),
-    fat: idx === 0 ? Math.max(0, meal.fat - Math.floor(meal.fat / count) * (count - 1)) : Math.floor(meal.fat / count),
-  }));
+function buildItemsFromSuggestion(
+  meal: SuggestedMeal,
+  multiplier: number
+): DetectedFoodItem[] {
+  const scaled = getScaledSuggestionNutrition(meal, multiplier);
+  const list =
+    scaled.ingredients.length > 0 ? scaled.ingredients : [meal.mealName];
+  const count = list.length;
+  const baseCal = Math.floor(scaled.totalCalories / count);
+  const remainderCal = scaled.totalCalories - baseCal * count;
+
+  return list.map((ing, idx) => {
+    const parsed = splitIngredientLineToPortionAndName(ing);
+    return {
+      name: parsed.name,
+      portion: parsed.portion,
+      calories: idx === 0 ? baseCal + remainderCal : baseCal,
+      protein:
+        idx === 0
+          ? Math.max(
+              0,
+              scaled.protein - Math.floor(scaled.protein / count) * (count - 1)
+            )
+          : Math.floor(scaled.protein / count),
+      carbs:
+        idx === 0
+          ? Math.max(
+              0,
+              scaled.carbs - Math.floor(scaled.carbs / count) * (count - 1)
+            )
+          : Math.floor(scaled.carbs / count),
+      fat:
+        idx === 0
+          ? Math.max(0, scaled.fat - Math.floor(scaled.fat / count) * (count - 1))
+          : Math.floor(scaled.fat / count),
+    };
+  });
 }
 
 export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
@@ -103,6 +149,9 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [variationSeed, setVariationSeed] = useState<number>(0);
+  const [portionMultipliers, setPortionMultipliers] = useState<
+    Record<string, number>
+  >({});
   const [registeredMealIds, setRegisteredMealIds] = useState<Record<string, boolean>>({});
   const [savedNotice, setSavedNotice] = useState<string>('');
   const [hasInitializedGoal, setHasInitializedGoal] = useState<boolean>(false);
@@ -149,6 +198,13 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
           variationSeed: nextSeed,
         });
         setGoalMeals(suggestions);
+        setPortionMultipliers((prev) => {
+          const next = { ...prev };
+          suggestions.forEach((s) => {
+            delete next[s.id];
+          });
+          return next;
+        });
       } catch (err) {
         setErrorMsg(
           err instanceof Error
@@ -260,6 +316,13 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
         variationSeed: nextSeed,
       });
       setPantryMeals(suggestions);
+      setPortionMultipliers((prev) => {
+        const next = { ...prev };
+        suggestions.forEach((s) => {
+          delete next[s.id];
+        });
+        return next;
+      });
     } catch (err) {
       setErrorMsg(
         err instanceof Error
@@ -272,17 +335,19 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
   };
 
   const handleRegisterSuggestedMeal = (meal: SuggestedMeal) => {
+    const multiplier = portionMultipliers[meal.id] ?? 1;
+    const scaled = getScaledSuggestionNutrition(meal, multiplier);
     const entry: MealEntry = {
       id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       date: selectedDate,
       timestamp: Date.now(),
       category: meal.category,
       mealName: meal.mealName,
-      totalCalories: meal.totalCalories,
-      protein: meal.protein,
-      carbs: meal.carbs,
-      fat: meal.fat,
-      items: buildItemsFromSuggestion(meal),
+      totalCalories: scaled.totalCalories,
+      protein: scaled.protein,
+      carbs: scaled.carbs,
+      fat: scaled.fat,
+      items: buildItemsFromSuggestion(meal, multiplier),
       aiTip: meal.preparationTip,
       isDemo: meal.isDemo,
     };
@@ -290,7 +355,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
     onSaveMeal(entry);
     setRegisteredMealIds((prev) => ({ ...prev, [meal.id]: true }));
     setSavedNotice(
-      `"${meal.mealName}" agregado a ${MEAL_CATEGORY_META[meal.category].label}`
+      `"${meal.mealName}" (${scaled.totalCalories} kcal) agregado a ${MEAL_CATEGORY_META[meal.category].label}`
     );
     setTimeout(() => setSavedNotice(''), 3000);
   };
@@ -620,6 +685,8 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
           {activeMeals.map((meal) => {
             const catMeta = MEAL_CATEGORY_META[meal.category];
             const isRegistered = Boolean(registeredMealIds[meal.id]);
+            const multiplier = portionMultipliers[meal.id] ?? 1;
+            const scaled = getScaledSuggestionNutrition(meal, multiplier);
             return (
               <article
                 key={meal.id}
@@ -646,7 +713,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
                   <div className="text-right shrink-0">
                     <p className="text-lg font-black text-emerald-700 leading-none">
-                      {meal.totalCalories}
+                      {scaled.totalCalories}
                     </p>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">
                       kcal
@@ -661,7 +728,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                       Proteína
                     </span>
                     <span className="text-xs font-extrabold text-sky-700">
-                      {meal.protein} g
+                      {scaled.protein} g
                     </span>
                   </div>
                   <div className="rounded-xl bg-amber-50/70 py-1.5 px-2">
@@ -669,7 +736,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                       Carbos
                     </span>
                     <span className="text-xs font-extrabold text-amber-700">
-                      {meal.carbs} g
+                      {scaled.carbs} g
                     </span>
                   </div>
                   <div className="rounded-xl bg-rose-50/70 py-1.5 px-2">
@@ -677,7 +744,7 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                       Grasas
                     </span>
                     <span className="text-xs font-extrabold text-rose-700">
-                      {meal.fat} g
+                      {scaled.fat} g
                     </span>
                   </div>
                 </div>
@@ -708,10 +775,10 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
 
                 {/* Ingredientes + Tip de preparación */}
                 <div className="rounded-2xl bg-slate-50 p-3 space-y-1.5 text-xs">
-                  {meal.ingredients.length > 0 && (
+                  {scaled.ingredients.length > 0 && (
                     <p className="text-slate-700 leading-relaxed">
                       <strong className="text-slate-900">Ingredientes:</strong>{' '}
-                      {meal.ingredients.join(' • ')}
+                      {scaled.ingredients.join(' • ')}
                     </p>
                   )}
                   <p className="text-slate-600 leading-relaxed">
@@ -724,6 +791,37 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                 <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50/70 border border-emerald-100 rounded-xl px-3 py-2">
                   {meal.fitReason}
                 </p>
+
+                {/* Selector compacto de porción */}
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 border border-slate-200/80 px-3 py-2">
+                  <span className="text-[11px] font-bold text-slate-600">
+                    Porción
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {SUGGESTION_PORTION_OPTIONS.map((opt) => {
+                      const active = Math.abs(multiplier - opt) < 0.01;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() =>
+                            setPortionMultipliers((prev) => ({
+                              ...prev,
+                              [meal.id]: opt,
+                            }))
+                          }
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
+                            active
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                          }`}
+                        >
+                          {opt}x
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Botón de registro directo */}
                 <button
@@ -745,7 +843,9 @@ export const MealSuggestionsView: React.FC<MealSuggestionsViewProps> = ({
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      <span>Registrar en {catMeta.label}</span>
+                      <span>
+                        Registrar en {catMeta.label} ({scaled.totalCalories} kcal)
+                      </span>
                     </>
                   )}
                 </button>
